@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kaagazai",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": ["-lc", "export PATH=\"$HOME/.local/node/bin:$PATH\"; cd \"$HOME/Hackathon-KaagazAi\" && exec npm run dev -- -p 3001"],
+      "port": 3001
+    },
+    {
+      "name": "justautomatex",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": ["-lc", "export PATH=\"$HOME/.local/node/bin:$PATH\"; cd \"$HOME/justautomatex\" && exec npm run dev -- -p 3002"],
+      "port": 3002
+    },
+    {
+      "name": "tomorrow-ui-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4173", "--directory", "/private/tmp/claude-501/-Users-surya-Hackathon-KaagazAi/501f71dc-19b2-4323-80b9-10f09bb008c0/scratchpad"],
+      "port": 4173
+    },
+    {
+      "name": "scheduler",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": ["-lc", "export PATH=\"$HOME/.local/node/bin:$PATH\"; cd \"$HOME/Scheduler\" && exec npm run dev"],
+      "port": 5174
+    }
+  ]
+}

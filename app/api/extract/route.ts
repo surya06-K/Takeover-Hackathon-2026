@@ -1,0 +1,276 @@
+import { NextResponse } from 'next/server';
+import type { EntryType, ExtractResult, ExtractedRow, ModelId } from '@/lib/types';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
+const SYSTEM_PROMPT =
+  "You are an expert at reading handwritten Indian business registers (Hindi, Telugu, English, Hinglish mixed). " +
+  "Extract every row. Respond ONLY strict JSON: { register_type: string, confidence: number, rows: [{ date: string|null, " +
+  "party: string|null, item: string|null, qty: number|null, amount: number|null, type: 'credit'|'payment'|'sale'|'stock'|null, " +
+  "raw_text: string }], notes: string }. If a value is unreadable, set null and preserve raw_text. Never invent values.";
+
+const GEMINI_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const MODEL_TIMEOUT_MS = 55_000;
+
+export async function POST(req: Request) {
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return friendly(400, 'That upload did not come through properly. Please try again.');
+  }
+
+  const image: unknown = body?.image;
+  if (typeof image !== 'string' || image.length < 100) {
+    return friendly(400, 'No photo received. Please pick or take a photo first.');
+  }
+
+  const { base64, mimeType } = splitDataUrl(image, body?.mimeType);
+  const registerType: string = typeof body?.registerType === 'string' ? body.registerType : 'auto-detect';
+  const hint =
+    registerType && registerType !== 'auto-detect'
+      ? `The user says this page is a "${registerType}". Extract every row.`
+      : 'Auto-detect the register type. Extract every row.';
+
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  const groqKey = process.env.GROQ_API_KEY?.trim();
+  const mock = process.env.KAAGAZ_MOCK === '1' || (!geminiKey && !groqKey);
+
+  if (mock) {
+    // No keys configured (or demo mode forced): serve honest, labelled sample data
+    // so the whole flow can be exercised without external APIs.
+    const pageNumber = Number(body?.page) || 1;
+    return NextResponse.json({ ok: true, model: 'sample' satisfies ModelId, data: samplePage(pageNumber) });
+  }
+
+  const failures: string[] = [];
+
+  if (geminiKey) {
+    try {
+      const data = await callGemini(geminiKey, base64, mimeType, hint);
+      return NextResponse.json({ ok: true, model: 'gemini' satisfies ModelId, data });
+    } catch (err) {
+      failures.push(`Gemini: ${errMessage(err)}`);
+    }
+  } else {
+    failures.push('Gemini: GEMINI_API_KEY not set');
+  }
+
+  if (groqKey) {
+    try {
+      const data = await callGroq(groqKey, base64, mimeType, hint);
+      return NextResponse.json({ ok: true, model: 'groq' satisfies ModelId, data });
+    } catch (err) {
+      failures.push(`Groq: ${errMessage(err)}`);
+    }
+  } else {
+    failures.push('Groq: GROQ_API_KEY not set');
+  }
+
+  console.error('[extract] all readers failed:', failures.join(' | '));
+  return friendly(
+    502,
+    'Both AI readers are unavailable right now. Check your connection and try again in a moment — your photo is still here.',
+    failures.join(' | ')
+  );
+}
+
+/* ---------------------------------- Gemini --------------------------------- */
+
+async function callGemini(
+  key: string,
+  base64: string,
+  mimeType: string,
+  hint: string
+): Promise<ExtractResult> {
+  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [
+        {
+          role: 'user',
+          parts: [{ inlineData: { mimeType, data: base64 } }, { text: hint }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: 'application/json',
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status} ${detail.slice(0, 300)}`);
+  }
+  const json = await res.json();
+  const text: string = (json?.candidates?.[0]?.content?.parts ?? [])
+    .map((p: any) => p?.text ?? '')
+    .join('');
+  if (!text) throw new Error('empty response');
+  return parseModelJson(text);
+}
+
+/* ----------------------------------- Groq ---------------------------------- */
+
+async function callGroq(
+  key: string,
+  base64: string,
+  mimeType: string,
+  hint: string
+): Promise<ExtractResult> {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+    },
+    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature: 0,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: `${SYSTEM_PROMPT}\n\n${hint}\nRespond with the JSON object only — no markdown fences.` },
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status} ${detail.slice(0, 300)}`);
+  }
+  const json = await res.json();
+  const text: string = json?.choices?.[0]?.message?.content ?? '';
+  if (!text) throw new Error('empty response');
+  return parseModelJson(text);
+}
+
+/* ------------------------------ JSON hardening ----------------------------- */
+
+/** Parse model output defensively: strip fences, isolate the outermost object,
+ *  then coerce every field to the contract so the UI never sees junk. */
+function parseModelJson(text: string): ExtractResult {
+  let s = text.trim();
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end <= start) throw new Error('no JSON object in response');
+  const parsed = JSON.parse(s.slice(start, end + 1));
+
+  const rowsIn = Array.isArray(parsed?.rows) ? parsed.rows : [];
+  const rows: ExtractedRow[] = rowsIn.map(normalizeRow);
+
+  let confidence = numOrNull(parsed?.confidence) ?? 0.5;
+  if (confidence > 1 && confidence <= 100) confidence /= 100; // models sometimes answer in %
+  confidence = Math.min(1, Math.max(0, confidence));
+
+  return {
+    register_type: strOrNull(parsed?.register_type) ?? 'unknown',
+    confidence,
+    rows,
+    notes: strOrNull(parsed?.notes) ?? '',
+  };
+}
+
+const ENTRY_TYPES = ['credit', 'payment', 'sale', 'stock'] as const;
+
+function normalizeRow(r: any): ExtractedRow {
+  const type = typeof r?.type === 'string' ? r.type.toLowerCase().trim() : null;
+  return {
+    date: strOrNull(r?.date),
+    party: strOrNull(r?.party),
+    item: strOrNull(r?.item),
+    qty: numOrNull(r?.qty),
+    amount: numOrNull(r?.amount),
+    type: (ENTRY_TYPES as readonly string[]).includes(type ?? '') ? (type as EntryType) : null,
+    raw_text: typeof r?.raw_text === 'string' ? r.raw_text : '',
+  };
+}
+
+function strOrNull(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s && s.toLowerCase() !== 'null' ? s : null;
+}
+
+function numOrNull(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const n = parseFloat(v.replace(/[₹,\s]/g, ''));
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+/* --------------------------------- helpers --------------------------------- */
+
+function splitDataUrl(image: string, fallbackMime?: unknown): { base64: string; mimeType: string } {
+  const match = /^data:([^;,]+);base64,(.*)$/s.exec(image);
+  if (match) return { mimeType: match[1], base64: match[2] };
+  return {
+    mimeType: typeof fallbackMime === 'string' && fallbackMime ? fallbackMime : 'image/jpeg',
+    base64: image,
+  };
+}
+
+function errMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.name === 'TimeoutError' ? 'timed out' : err.message;
+  }
+  return String(err);
+}
+
+function friendly(status: number, error: string, detail?: string) {
+  return NextResponse.json({ ok: false, error, detail }, { status });
+}
+
+/* ------------------------- built-in sample register ------------------------ */
+/** Two pages of a realistic kirana udhaar register so the merge demo works
+ *  end-to-end without API keys. Clearly labelled `model: "sample"` in the UI. */
+function samplePage(pageNumber: number): ExtractResult {
+  const pages: ExtractResult[] = [
+    {
+      register_type: 'Udhaar / Credit Ledger',
+      confidence: 0.86,
+      notes:
+        'Sample page 1 (built-in demo data — add GEMINI_API_KEY to read real photos). Names appear in Hindi, Telugu and English, just like a real register. Amount for लक्ष्मी जनरल was smudged.',
+      rows: [
+        { date: '02/07/2026', party: 'रमेश यादव', item: 'Atta 10kg', qty: 2, amount: 920, type: 'credit', raw_text: 'रमेश यादव — आटा 10kg x2 — 920' },
+        { date: '02/07/2026', party: 'Sunita Devi', item: 'Tel (oil) 1L', qty: 3, amount: 540, type: 'credit', raw_text: 'सुनीता देवी तेल 1L x3 ₹540 udhaar' },
+        { date: '03/07/2026', party: 'रमेश यादव', item: null, qty: null, amount: 500, type: 'payment', raw_text: 'रमेश जमा ₹500' },
+        { date: '03/07/2026', party: 'ఆనంద్ ట్రేడర్స్', item: 'Chawal 25kg', qty: 5, amount: 6250, type: 'credit', raw_text: 'ఆనంద్ ట్రేడర్స్ — chawal 25kg bag x5 = 6250' },
+        { date: '04/07/2026', party: 'लक्ष्मी जनरल', item: 'Sabun (soap) box', qty: 4, amount: null, type: 'credit', raw_text: 'లక్ష్మి జనరల్ — సబ్బు పెట్టె x4 — ??? (smudged)' },
+        { date: '04/07/2026', party: 'Sunita Devi', item: null, qty: null, amount: 540, type: 'payment', raw_text: 'Sunita full jama 540' },
+      ],
+    },
+    {
+      register_type: 'Udhaar / Credit Ledger',
+      confidence: 0.79,
+      notes:
+        'Sample page 2 (built-in demo data). Handwriting fainter on this page; one qty unreadable. रमेश यादव, ఆనంద్ ట్రేడర్స్ and भवानी स्टोर्स carry over from page 1.',
+      rows: [
+        { date: '05/07/2026', party: 'ఆనంద్ ట్రేడర్స్', item: null, qty: null, amount: 2000, type: 'payment', raw_text: 'ఆనంద్ — 2000 jama (cheque)' },
+        { date: '05/07/2026', party: 'भवानी स्टोर्स', item: 'Chini (sugar) 5kg', qty: 6, amount: 1380, type: 'credit', raw_text: 'भवानी स्टोर्स चीनी 5kg x6 — 1380' },
+        { date: '06/07/2026', party: 'रमेश यादव', item: 'Dal 5kg', qty: null, amount: 780, type: 'credit', raw_text: 'रमेश — dal 5kg x? ₹780 (qty faint)' },
+        { date: '06/07/2026', party: 'मोहम्मद इरफ़ान', item: 'Biscuit carton', qty: 2, amount: 3400, type: 'credit', raw_text: 'Md Irfan biscuit carton x2 3400 udhaar' },
+        { date: '06/07/2026', party: 'मोहम्मद इरफ़ान', item: 'Namkeen carton', qty: 1, amount: 1750, type: 'credit', raw_text: 'Irfan namkeen x1 1750' },
+        { date: '06/07/2026', party: 'भवानी स्टोर्स', item: null, qty: null, amount: 1000, type: 'payment', raw_text: 'Bhavani jama 1000/-' },
+      ],
+
+    },
+  ];
+  return pages[(pageNumber - 1) % pages.length];
+}

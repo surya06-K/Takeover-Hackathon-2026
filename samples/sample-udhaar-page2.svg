@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1650" viewBox="0 0 1240 1650">
+  <rect width="1240" height="1650" fill="#f5eedb"/>
+  <rect width="1240" height="1650" fill="#ece1c6" opacity="0.4"/>
+  <rect x="1180" y="0" width="60" height="1650" fill="#d8ccae" opacity="0.5"/>
+  <g stroke="#a8b8cf" stroke-width="2" opacity="0.7">
+    <line x1="30" y1="260" x2="1210" y2="258"/>
+    <line x1="30" y1="352" x2="1210" y2="350"/>
+    <line x1="30" y1="444" x2="1210" y2="442"/>
+    <line x1="30" y1="536" x2="1210" y2="534"/>
+    <line x1="30" y1="628" x2="1210" y2="626"/>
+    <line x1="30" y1="720" x2="1210" y2="718"/>
+    <line x1="30" y1="812" x2="1210" y2="810"/>
+    <line x1="30" y1="904" x2="1210" y2="902"/>
+    <line x1="30" y1="996" x2="1210" y2="994"/>
+    <line x1="30" y1="1088" x2="1210" y2="1086"/>
+    <line x1="30" y1="1180" x2="1210" y2="1178"/>
+    <line x1="30" y1="1272" x2="1210" y2="1270"/>
+    <line x1="30" y1="1364" x2="1210" y2="1362"/>
+    <line x1="30" y1="1456" x2="1210" y2="1454"/>
+    <line x1="30" y1="1548" x2="1210" y2="1546"/>
+  </g>
+  <line x1="140" y1="30" x2="144" y2="1630" stroke="#c34a3a" stroke-width="3" opacity="0.8"/>
+
+  <g font-family="Devanagari MT, Kohinoor Devanagari, Bradley Hand, Marker Felt, cursive" fill="#2a3260">
+    <g transform="rotate(0.5 620 180)">
+      <text x="380" y="160" font-size="50" fill="#1c2c5e">उधार खाता — पेज 2</text>
+      <line x1="380" y1="185" x2="860" y2="187" stroke="#2a3260" stroke-width="3"/>
+    </g>
+
+    <g transform="rotate(-0.4 620 330)" font-family="Bradley Hand, Marker Felt, Comic Sans MS, cursive">
+      <text x="55" y="333" font-size="38">5/7</text>
+      <text x="170" y="335" font-size="42">Anand Traders — jama (cheque)</text>
+      <text x="900" y="333" font-size="44" fill="#1e5b38">2000 ✓</text>
+    </g>
+
+    <g transform="rotate(0.4 620 425)">
+      <text x="55" y="428" font-size="40">5/7</text>
+      <text x="170" y="430" font-size="44">भवानी स्टोर्स — चीनी 5kg × 6</text>
+      <text x="900" y="428" font-size="46">1380</text>
+    </g>
+
+    <!-- fainter pencil entry, qty unclear -->
+    <g transform="rotate(-0.6 620 520)" opacity="0.55" fill="#4a5568">
+      <text x="55" y="522" font-size="40">6/7</text>
+      <text x="170" y="524" font-size="44">रमेश — दाल 5kg ×</text>
+      <text x="640" y="520" font-size="44">?</text>
+      <text x="900" y="522" font-size="46">780</text>
+    </g>
+
+    <g transform="rotate(0.3 620 615)" font-family="Bradley Hand, Marker Felt, Comic Sans MS, cursive">
+      <text x="55" y="617" font-size="38">6/7</text>
+      <text x="170" y="619" font-size="42">Md. Irfan — biscuit carton x2</text>
+      <text x="880" y="617" font-size="44">3400 udhaar</text>
+    </g>
+
+    <g transform="rotate(-0.3 620 705)" font-family="Bradley Hand, Marker Felt, Comic Sans MS, cursive">
+      <text x="55" y="707" font-size="38">6/7</text>
+      <text x="170" y="709" font-size="42">Irfan — namkeen carton x1</text>
+      <text x="900" y="707" font-size="44">1750</text>
+    </g>
+
+    <g transform="rotate(0.5 620 800)">
+      <text x="55" y="802" font-size="40">6/7</text>
+      <text x="170" y="804" font-size="44">भवानी — जमा</text>
+      <text x="900" y="802" font-size="46" fill="#1e5b38">1000/-</text>
+    </g>
+
+    <!-- reminder note in margin -->
+    <g transform="rotate(-3 950 950)" font-family="Bradley Hand, cursive" fill="#8a5a1f">
+      <text x="760" y="950" font-size="34">Irfan se paise lena hai!!</text>
+      <line x1="758" y1="962" x2="1130" y2="958" stroke="#8a5a1f" stroke-width="2"/>
+    </g>
+  </g>
+
+  <!-- finger shadow corner -->
+  <ellipse cx="80" cy="1560" rx="130" ry="90" fill="#8a7a58" opacity="0.18"/>
+</svg>
