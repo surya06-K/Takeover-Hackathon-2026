@@ -5,8 +5,10 @@ import {
   type KaagazStore,
   type Party,
   type PartyWithBalance,
+  type SaleEntry,
   type ScanPage,
   type Shop,
+  type StockEntry,
   type Txn,
 } from './types';
 
@@ -75,6 +77,32 @@ const mapPage = (r: any): ScanPage => ({
   confidence: Number(r.confidence),
   notes: r.notes ?? '',
   rowCount: r.row_count,
+  createdAt: r.created_at,
+});
+
+const mapSale = (r: any): SaleEntry => ({
+  id: r.id,
+  shopId: r.shop_id,
+  pageId: r.page_id,
+  partyName: r.party_name,
+  item: r.item,
+  qty: r.qty == null ? null : Number(r.qty),
+  amount: Number(r.amount),
+  txnDate: r.txn_date,
+  rawText: r.raw_text,
+  createdAt: r.created_at,
+});
+
+const mapStock = (r: any): StockEntry => ({
+  id: r.id,
+  shopId: r.shop_id,
+  pageId: r.page_id,
+  item: r.item,
+  qty: Number(r.qty),
+  direction: r.direction,
+  amount: r.amount == null ? null : Number(r.amount),
+  txnDate: r.txn_date,
+  rawText: r.raw_text,
   createdAt: r.created_at,
 });
 
@@ -202,5 +230,59 @@ export const supabaseStore: KaagazStore = {
       .order('page_number', { ascending: true });
     if (error) fail('listPages', error);
     return (data ?? []).map(mapPage);
+  },
+
+  async addSaleEntries(shopId, entries) {
+    if (entries.length === 0) return [];
+    const rows = entries.map((e) => ({
+      id: uid(),
+      shop_id: shopId,
+      page_id: e.pageId,
+      party_name: e.partyName,
+      item: e.item,
+      qty: e.qty,
+      amount: e.amount,
+      txn_date: e.txnDate,
+      raw_text: e.rawText,
+    }));
+    const { data, error } = await sb().from('sale_entries').insert(rows).select();
+    if (error || !data) fail('addSaleEntries', error);
+    return data.map(mapSale);
+  },
+  async listSales(shopId) {
+    const { data, error } = await sb()
+      .from('sale_entries')
+      .select('*')
+      .eq('shop_id', shopId)
+      .order('created_at', { ascending: false });
+    if (error) fail('listSales', error);
+    return (data ?? []).map(mapSale);
+  },
+
+  async addStockEntries(shopId, entries) {
+    if (entries.length === 0) return [];
+    const rows = entries.map((e) => ({
+      id: uid(),
+      shop_id: shopId,
+      page_id: e.pageId,
+      item: e.item,
+      qty: e.qty,
+      direction: e.direction,
+      amount: e.amount,
+      txn_date: e.txnDate,
+      raw_text: e.rawText,
+    }));
+    const { data, error } = await sb().from('stock_entries').insert(rows).select();
+    if (error || !data) fail('addStockEntries', error);
+    return data.map(mapStock);
+  },
+  async listStock(shopId) {
+    const { data, error } = await sb()
+      .from('stock_entries')
+      .select('*')
+      .eq('shop_id', shopId)
+      .order('created_at', { ascending: false });
+    if (error) fail('listStock', error);
+    return (data ?? []).map(mapStock);
   },
 };

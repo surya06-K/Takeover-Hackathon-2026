@@ -1,4 +1,5 @@
 /** Domain model for the khata (persistent ledger). */
+import type { Section } from '@/lib/register';
 
 export interface Shop {
   id: string;
@@ -44,6 +45,36 @@ export interface ScanPage {
   createdAt: string;
 }
 
+/** One sale row from a scanned bill book (or a manual entry). */
+export interface SaleEntry {
+  id: string;
+  shopId: string;
+  pageId: string | null;
+  partyName: string | null; // free text — no party matching for sales in v1
+  item: string | null;
+  qty: number | null;
+  amount: number;
+  txnDate: string | null;
+  rawText: string | null;
+  createdAt: string;
+}
+
+export type StockDirection = 'in' | 'out';
+
+/** One stock movement from a scanned stock register (or a manual entry). */
+export interface StockEntry {
+  id: string;
+  shopId: string;
+  pageId: string | null;
+  item: string;
+  qty: number;
+  direction: StockDirection;
+  amount: number | null;
+  txnDate: string | null;
+  rawText: string | null;
+  createdAt: string;
+}
+
 /** Party + computed balance for lists. */
 export interface PartyWithBalance extends Party {
   credits: number;
@@ -76,14 +107,41 @@ export interface CommitRowInput {
   /** Name as extracted from the page — stored as a variant when it differs
    *  from an existing party's saved name (cross-script matching later). */
   extractedName?: string;
+  /** Original as-written spelling, when the party/item cells were rewritten
+   *  by the language switch — kept as a name variant on newly created parties. */
+  originalName?: string;
+}
+
+export interface CommitSaleRowInput {
+  partyName: string | null;
+  item: string | null;
+  qty: number | null;
+  amount: number;
+  txnDate: string | null;
+  rawText: string | null;
+}
+
+export interface CommitStockRowInput {
+  item: string;
+  qty: number;
+  direction: StockDirection;
+  amount: number | null;
+  txnDate: string | null;
+  rawText: string | null;
 }
 
 export interface CommitPageInput {
+  section: Section;
   model: string;
   registerType: string;
   confidence: number;
   notes: string;
-  rows: CommitRowInput[];
+  /** Present when section === 'udhaar' */
+  rows?: CommitRowInput[];
+  /** Present when section === 'sales' */
+  saleRows?: CommitSaleRowInput[];
+  /** Present when section === 'stock' */
+  stockRows?: CommitStockRowInput[];
 }
 
 export interface KaagazStore {
@@ -110,6 +168,20 @@ export interface KaagazStore {
     page: Omit<ScanPage, 'id' | 'shopId' | 'pageNumber' | 'createdAt'>
   ): Promise<ScanPage>;
   listPages(shopId: string): Promise<ScanPage[]>;
+
+  // sales
+  addSaleEntries(
+    shopId: string,
+    entries: Omit<SaleEntry, 'id' | 'shopId' | 'createdAt'>[]
+  ): Promise<SaleEntry[]>;
+  listSales(shopId: string): Promise<SaleEntry[]>;
+
+  // stock
+  addStockEntries(
+    shopId: string,
+    entries: Omit<StockEntry, 'id' | 'shopId' | 'createdAt'>[]
+  ): Promise<StockEntry[]>;
+  listStock(shopId: string): Promise<StockEntry[]>;
 }
 
 export function computeBalanceFields(txns: Txn[]): {

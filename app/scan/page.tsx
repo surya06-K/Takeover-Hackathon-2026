@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ReviewTable, { isLowConfidence, type ReviewRow } from '@/components/ReviewTable';
 import { fileToJpegDataUrl } from '@/lib/image';
+import { detectLangs, LANG_LABELS, type LangCode } from '@/lib/lang';
 import { formatINR } from '@/lib/ledger';
 import { formatPhone } from '@/lib/phone';
+import { normalizeSection, type Section } from '@/lib/register';
 import type { PartyWithBalance } from '@/lib/db/types';
 import {
   MODEL_LABELS,
@@ -17,12 +19,15 @@ import {
 
 type Phase = 'pick' | 'loading' | 'review' | 'match' | 'saving' | 'error';
 
-const REGISTER_TYPES = [
-  { id: 'auto-detect', label: 'Auto-detect', hint: 'Let the AI decide' },
-  { id: 'Udhaar / Credit Ledger', label: 'Udhaar / Credit Ledger', hint: 'खाता — who owes what' },
-  { id: 'Sales / Bill Book', label: 'Sales / Bill Book', hint: 'Daily sales & bills' },
-  { id: 'Stock Register', label: 'Stock Register', hint: 'Items in and out' },
+const REGISTER_TYPES: { id: string; label: string; hint: string; section: Section | null }[] = [
+  { id: 'auto-detect', label: 'Auto-detect', hint: 'Let the AI decide', section: null },
+  { id: 'Udhaar / Credit Ledger', label: 'Udhaar / Credit Ledger', hint: 'खाता — who owes what', section: 'udhaar' },
+  { id: 'Sales / Bill Book', label: 'Sales / Bill Book', hint: 'Daily sales & bills', section: 'sales' },
+  { id: 'Stock Register', label: 'Stock Register', hint: 'Items in and out', section: 'stock' },
 ];
+
+const SECTION_SHORT: Record<Section, string> = { udhaar: 'Udhaar', sales: 'Sales', stock: 'Stock' };
+const SECTION_DEST: Record<Section, string> = { udhaar: '/udhaar', sales: '/sales', stock: '/stock' };
 
 const LOADING_MESSAGES = [
   'Reading handwriting…',
@@ -31,7 +36,7 @@ const LOADING_MESSAGES = [
   'Double-checking amounts…',
 ];
 
-/** One distinct extracted party name awaiting resolution. */
+/** One distinct extracted party name awaiting resolution (udhaar only). */
 interface MatchGroup {
   name: string;
   rows: number;
@@ -39,6 +44,8 @@ interface MatchGroup {
   /** 'new' or an existing party id */
   choice: string;
   phone: string;
+  /** As-written spelling, when it differs from the (possibly translated) name. */
+  originalName?: string;
 }
 
 export default function ScanPage() {
@@ -57,11 +64,25 @@ export default function ScanPage() {
   const [groups, setGroups] = useState<MatchGroup[]>([]);
   const [skippedCount, setSkippedCount] = useState(0);
 
+  // section routing (fix #2)
+  const [section, setSection] = useState<Section>('udhaar');
+  const [autoDetectedSection, setAutoDetectedSection] = useState<Section | null>(null);
+  const [userPickedSection, setUserPickedSection] = useState<Section | null>(null);
+
+  // output-language switch (fix #1) — origCells is the pristine source of
+  // truth for party/item; language switches derive from it and never
+  // overwrite it, only genuine user edits do (see handleRowsChange).
+  const [origCells, setOrigCells] = useState<Record<string, { party: string; item: string }>>({});
+  const [outLang, setOutLang] = useState<'original' | LangCode>('original');
+  const [langCache, setLangCache] = useState<Partial<Record<LangCode, Record<string, string>>>>({});
+  const [translating, setTranslating] = useState(false);
+  const [langError, setLangError] = useState('');
+
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // page count for the "Digitize page N" heading + sample-data rotation;
+    // page count for the "Scan page N" heading + sample-data rotation;
     // parties for the match step (refreshed again before matching).
     fetch('/api/dashboard')
       .then((r) => r.json())
@@ -95,6 +116,15 @@ export default function ScanPage() {
     }
   }
 
+  function resetForNewPhoto() {
+    setDataUrl(null);
+    setPhase('pick');
+    setOrigCells({});
+    setOutLang('original');
+    setLangCache({});
+    setLangError('');
+  }
+
   async function submit() {
     if (!dataUrl) return;
     setPhase('loading');
@@ -112,18 +142,34 @@ export default function ScanPage() {
       }
       setModel(json.model);
       setResult(json.data);
-      setRows(
-        json.data.rows.map((r) => ({
-          id: uid(),
-          date: r.date ?? '',
-          party: r.party ?? '',
-          item: r.item ?? '',
-          qty: r.qty != null ? String(r.qty) : '',
-          amount: r.amount != null ? String(r.amount) : '',
-          type: r.type,
-          raw_text: r.raw_text ?? '',
-        }))
-      );
+      const newRows: ReviewRow[] = json.data.rows.map((r) => ({
+        id: uid(),
+        date: r.date ?? '',
+        party: r.party ?? '',
+        item: r.item ?? '',
+        qty: r.qty != null ? String(r.qty) : '',
+        amount: r.amount != null ? String(r.amount) : '',
+        type: r.type,
+        raw_text: r.raw_text ?? '',
+      }));
+      setRows(newRows);
+
+      // Fix #1: snapshot the AI's original party/item text per row — this is
+      // what language switching derives from and what "As written" restores.
+      const oc: Record<string, { party: string; item: string }> = {};
+      for (const r of newRows) oc[r.id] = { party: r.party, item: r.item };
+      setOrigCells(oc);
+      setOutLang('original');
+      setLangCache({});
+      setLangError('');
+
+      // Fix #2: decide which section this page belongs in.
+      const picked = REGISTER_TYPES.find((t) => t.id === registerType)?.section ?? null;
+      const detected = normalizeSection(json.data.register_type);
+      setUserPickedSection(picked);
+      setAutoDetectedSection(detected);
+      setSection(picked ?? detected);
+
       setPhase('review');
     } catch {
       setErrorMsg('Could not reach the reader — check your connection and try again.');
@@ -131,10 +177,86 @@ export default function ScanPage() {
     }
   }
 
-  /** Review approved → build match groups for every usable row. */
+  /** Every genuine user edit (typing, add row, delete row) — keeps origCells
+   *  in sync so it always reflects the latest known-correct party/item text. */
+  function handleRowsChange(newRows: ReviewRow[]) {
+    setRows(newRows);
+    setOrigCells(() => {
+      const next: Record<string, { party: string; item: string }> = {};
+      for (const r of newRows) next[r.id] = { party: r.party, item: r.item };
+      return next;
+    });
+  }
+
+  const detectedLangs = detectLangs(Object.values(origCells).flatMap((o) => [o.party, o.item]));
+
+  async function chooseLang(lang: 'original' | LangCode) {
+    setLangError('');
+    if (lang === 'original') {
+      setRows((rs) =>
+        rs.map((r) => ({
+          ...r,
+          party: origCells[r.id]?.party ?? r.party,
+          item: origCells[r.id]?.item ?? r.item,
+        }))
+      );
+      setOutLang('original');
+      return;
+    }
+
+    const texts = [
+      ...new Set(
+        Object.values(origCells)
+          .flatMap((o) => [o.party, o.item])
+          .filter((t) => t.trim())
+      ),
+    ];
+    const cached = langCache[lang] ?? {};
+    const missing = texts.filter((t) => !(t in cached));
+    let map = cached;
+
+    if (missing.length > 0) {
+      setTranslating(true);
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texts: missing, target: lang }),
+        });
+        const json = await res.json();
+        if (!json.ok) {
+          setLangError('Could not switch language. Please try again.');
+          return;
+        }
+        map = { ...cached, ...(json.map ?? {}) };
+        setLangCache((c) => ({ ...c, [lang]: map }));
+      } catch {
+        setLangError('Could not reach the translator — check your connection.');
+        return;
+      } finally {
+        setTranslating(false);
+      }
+    }
+
+    setRows((rs) =>
+      rs.map((r) => {
+        const oc = origCells[r.id];
+        if (!oc) return r;
+        return {
+          ...r,
+          party: oc.party.trim() ? map[oc.party] ?? oc.party : r.party,
+          item: oc.item.trim() ? map[oc.item] ?? oc.item : r.item,
+        };
+      })
+    );
+    setOutLang(lang);
+  }
+
+  /** Review approved (udhaar) → build match groups for every usable row. */
   function toMatching() {
+    setErrorMsg('');
     refreshParties();
-    const usable = usableRows();
+    const usable = usableUdhaarRows();
     setSkippedCount(rows.length - usable.length);
 
     const byName = new Map<string, MatchGroup>();
@@ -144,6 +266,8 @@ export default function ScanPage() {
       const g = byName.get(key) ?? { name, rows: 0, total: 0, choice: 'new', phone: '' };
       g.rows += 1;
       g.total += parseNum(r.amount) ?? 0;
+      const oc = origCells[r.id];
+      if (!g.originalName && oc?.party.trim() && oc.party.trim() !== name) g.originalName = oc.party.trim();
       byName.set(key, g);
     }
     // preselect an existing party when the name (or a saved variant) matches
@@ -159,7 +283,7 @@ export default function ScanPage() {
     setPhase('match');
   }
 
-  function usableRows(): ReviewRow[] {
+  function usableUdhaarRows(): ReviewRow[] {
     return rows.filter(
       (r) =>
         r.party.trim() &&
@@ -168,11 +292,19 @@ export default function ScanPage() {
     );
   }
 
-  async function commit() {
+  function usableSaleRows(): ReviewRow[] {
+    return rows.filter((r) => parseNum(r.amount) != null);
+  }
+
+  function usableStockRows(): ReviewRow[] {
+    return rows.filter((r) => r.item.trim() && parseNum(r.qty) != null);
+  }
+
+  async function commitUdhaar() {
     if (!result) return;
     setPhase('saving');
     const groupByName = new Map(groups.map((g) => [g.name.toLowerCase(), g]));
-    const commitRows = usableRows().map((r) => {
+    const commitRows = usableUdhaarRows().map((r) => {
       const g = groupByName.get(r.party.trim().toLowerCase())!;
       const base = {
         // in an udhaar khata a 'sale' row is goods given on credit
@@ -183,21 +315,61 @@ export default function ScanPage() {
         rawText: r.raw_text || null,
       };
       return g.choice === 'new'
-        ? { ...base, newParty: { name: g.name, phone: g.phone || null } }
+        ? { ...base, newParty: { name: g.name, phone: g.phone || null }, originalName: g.originalName }
         : { ...base, partyId: g.choice, extractedName: g.name };
     });
 
+    await doCommit({
+      section: 'udhaar',
+      model,
+      registerType: result.register_type,
+      confidence: result.confidence,
+      notes: result.notes,
+      rows: commitRows,
+    });
+  }
+
+  async function commitNonUdhaar() {
+    if (!result) return;
+    setPhase('saving');
+    const payload: Record<string, unknown> = {
+      section,
+      model,
+      registerType: result.register_type,
+      confidence: result.confidence,
+      notes: result.notes,
+    };
+    if (section === 'sales') {
+      payload.saleRows = usableSaleRows().map((r) => ({
+        partyName: r.party.trim() || null,
+        item: r.item.trim() || null,
+        qty: parseNum(r.qty),
+        amount: parseNum(r.amount)!,
+        txnDate: r.date.trim() || null,
+        rawText: r.raw_text || null,
+      }));
+    } else {
+      payload.stockRows = usableStockRows().map((r) => ({
+        item: r.item.trim(),
+        qty: parseNum(r.qty)!,
+        // heuristic: an extraction typed 'sale' means goods left the shop;
+        // everything else (credit/payment/stock/untyped) is stock coming in.
+        direction: r.type === 'sale' ? 'out' : 'in',
+        amount: parseNum(r.amount),
+        txnDate: r.date.trim() || null,
+        rawText: r.raw_text || null,
+      }));
+    }
+    await doCommit(payload);
+  }
+
+  async function doCommit(payload: Record<string, unknown>) {
+    setErrorMsg('');
     try {
       const res = await fetch('/api/pages/commit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          registerType: result.register_type,
-          confidence: result.confidence,
-          notes: result.notes,
-          rows: commitRows,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!json.ok) {
@@ -205,15 +377,26 @@ export default function ScanPage() {
         setPhase('error');
         return;
       }
-      router.push('/udhaar');
+      router.push(SECTION_DEST[section]);
       router.refresh();
     } catch {
       setErrorMsg('Could not reach the server — your review is still here, try again.');
-      setPhase('match');
+      setPhase(section === 'udhaar' ? 'match' : 'review');
     }
   }
 
+  function approveReview() {
+    if (section === 'udhaar') toMatching();
+    else commitNonUdhaar();
+  }
+
   const lowCount = rows.filter(isLowConfidence).length;
+  const canProceed =
+    section === 'udhaar'
+      ? usableUdhaarRows().length > 0
+      : section === 'sales'
+        ? usableSaleRows().length > 0
+        : usableStockRows().length > 0;
 
   return (
     <div className="container section" style={{ paddingBottom: 24 }}>
@@ -335,25 +518,72 @@ export default function ScanPage() {
 
           {result.notes && <p className="notes-callout">Reader’s note: {result.notes}</p>}
 
-          <ReviewTable rows={rows} onChange={setRows} />
+          <div className="lang-switch">
+            <span className="lang-switch-label">Save to section</span>
+            <div className="lang-pills" role="group" aria-label="Section">
+              {(['udhaar', 'sales', 'stock'] as Section[]).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className="lang-pill"
+                  aria-pressed={section === opt}
+                  onClick={() => setSection(opt)}
+                >
+                  {SECTION_SHORT[opt]}
+                </button>
+              ))}
+            </div>
+            {userPickedSection && autoDetectedSection && userPickedSection !== autoDetectedSection && (
+              <span className="lang-status err">
+                You picked {SECTION_SHORT[userPickedSection]}, but this looks like{' '}
+                {SECTION_SHORT[autoDetectedSection]} — check the section above.
+              </span>
+            )}
+          </div>
+
+          {detectedLangs.length >= 2 && (
+            <div className="lang-switch">
+              <span className="lang-switch-label">Output language</span>
+              <div className="lang-pills" role="group" aria-label="Output language">
+                <button
+                  type="button"
+                  className="lang-pill"
+                  aria-pressed={outLang === 'original'}
+                  disabled={translating}
+                  onClick={() => chooseLang('original')}
+                >
+                  As written
+                </button>
+                {detectedLangs.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    className="lang-pill"
+                    aria-pressed={outLang === l}
+                    disabled={translating}
+                    onClick={() => chooseLang(l)}
+                  >
+                    {LANG_LABELS[l]}
+                  </button>
+                ))}
+              </div>
+              {translating && <span className="lang-status">Translating…</span>}
+              {!translating && outLang !== 'original' && (
+                <span className="lang-status ok">Names &amp; items rewritten · original kept as raw text below</span>
+              )}
+              {langError && <span className="lang-status err">{langError}</span>}
+            </div>
+          )}
+
+          <ReviewTable rows={rows} onChange={handleRowsChange} />
+
+          {errorMsg && <p className="form-error" style={{ textAlign: 'center', marginTop: 14 }}>{errorMsg}</p>}
 
           <div className="review-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-lg"
-              disabled={usableRows().length === 0}
-              onClick={toMatching}
-            >
-              Looks right → match parties
+            <button type="button" className="btn btn-primary btn-lg" disabled={!canProceed} onClick={approveReview}>
+              {section === 'udhaar' ? 'Looks right → match parties' : `✓ Save to ${SECTION_SHORT[section]}`}
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => {
-                setDataUrl(null);
-                setPhase('pick');
-              }}
-            >
+            <button type="button" className="btn btn-ghost" onClick={resetForNewPhoto}>
               Re-shoot this page
             </button>
           </div>
@@ -414,8 +644,10 @@ export default function ScanPage() {
             );
           })}
 
+          {errorMsg && <p className="form-error" style={{ textAlign: 'center', marginTop: 4 }}>{errorMsg}</p>}
+
           <div className="review-actions">
-            <button type="button" className="btn btn-primary btn-lg" onClick={commit}>
+            <button type="button" className="btn btn-primary btn-lg" onClick={commitUdhaar}>
               ✓ Save to khata
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setPhase('review')}>
@@ -429,7 +661,7 @@ export default function ScanPage() {
         <div className="card loading-card">
           <div className="scan-dot" aria-hidden />
           <div className="loading-msg" role="status">
-            Writing entries to the khata…
+            Writing entries to {SECTION_SHORT[section]}…
           </div>
         </div>
       )}
@@ -447,14 +679,7 @@ export default function ScanPage() {
                 Try again
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => {
-                setDataUrl(null);
-                setPhase('pick');
-              }}
-            >
+            <button type="button" className="btn btn-ghost" onClick={resetForNewPhoto}>
               Use a different photo
             </button>
           </div>

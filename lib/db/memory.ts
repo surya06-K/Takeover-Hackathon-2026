@@ -5,8 +5,10 @@ import {
   type NewTxnInput,
   type Party,
   type PartyWithBalance,
+  type SaleEntry,
   type ScanPage,
   type Shop,
+  type StockEntry,
   type Txn,
 } from './types';
 
@@ -20,11 +22,20 @@ interface MemState {
   parties: Party[];
   txns: Txn[];
   pages: ScanPage[];
+  sales: SaleEntry[];
+  stock: StockEntry[];
 }
 
 // Survive Next.js dev HMR by hanging state off globalThis.
 const g = globalThis as unknown as { __kaagazMem?: MemState };
-const state: MemState = (g.__kaagazMem ??= { shops: [], parties: [], txns: [], pages: [] });
+const state: MemState = (g.__kaagazMem ??= {
+  shops: [],
+  parties: [],
+  txns: [],
+  pages: [],
+  sales: [],
+  stock: [],
+});
 
 const now = () => new Date().toISOString();
 
@@ -109,5 +120,27 @@ export const memoryStore: KaagazStore = {
     return state.pages
       .filter((p) => p.shopId === shopId)
       .sort((a, b) => a.pageNumber - b.pageNumber);
+  },
+
+  async addSaleEntries(shopId, entries) {
+    const saved = entries.map((e): SaleEntry => ({ ...e, id: uid(), shopId, createdAt: now() }));
+    state.sales.push(...saved);
+    return saved;
+  },
+  async listSales(shopId) {
+    return state.sales
+      .filter((s) => s.shopId === shopId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async addStockEntries(shopId, entries) {
+    const saved = entries.map((e): StockEntry => ({ ...e, id: uid(), shopId, createdAt: now() }));
+    state.stock.push(...saved);
+    return saved;
+  },
+  async listStock(shopId) {
+    return state.stock
+      .filter((s) => s.shopId === shopId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 };
