@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
+import AppShell from '@/components/AppShell';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'KaagazAI — Your paper register, digital in one photo',
   description:
-    'Photograph a handwritten Indian business register — udhaar ledger, bill book or stock register — and KaagazAI turns it into clean digital records you can review, merge and export.',
+    'Photograph a handwritten Indian business register — udhaar ledger, bill book or stock register — and KaagazAI turns it into a living digital khata with party balances, phone lookup and exports.',
 };
 
 export const viewport: Viewport = {
@@ -28,22 +29,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="site-header">
           <div className="container">
-            <Link href="/" className="brand">
+            <Link href="/home" className="brand">
               Kaagaz<em>AI</em>
               <span className="brand-hindi">कागज़ → डिजिटल</span>
             </Link>
-            <nav className="nav-links">
-              <Link href="/digitize">Digitize</Link>
-              <Link href="/ledger">Ledger</Link>
-            </nav>
           </div>
         </header>
-        <main>{children}</main>
-        <footer className="footer">
-          <div className="container">
-            KaagazAI · Built for shopkeepers who trust paper — and deserve backups.
-          </div>
-        </footer>
+        <main className="app-main">{children}</main>
+        <AppShell />
       </body>
     </html>
   );
