@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
+import AccessibilityToolbar from '@/components/AccessibilityToolbar';
+import ClientProviders from '@/components/ClientProviders';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -17,7 +19,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="hi" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -27,16 +29,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <header className="site-header">
-          <div className="container">
-            <Link href="/home" className="brand">
-              Kaagaz<em>AI</em>
-              <span className="brand-hindi">कागज़ → डिजिटल</span>
-            </Link>
-          </div>
-        </header>
-        <main className="app-main">{children}</main>
-        <AppShell />
+        <ClientProviders>
+          <header className="site-header">
+            <div className="container header-row">
+              <Link href="/home" className="brand">
+                Kaagaz<em>AI</em>
+                <span className="brand-hindi">कागज़ → डिजिटल</span>
+              </Link>
+              <AccessibilityToolbar />
+            </div>
+          </header>
+          <main className="app-main">{children}</main>
+          <AppShell />
+        </ClientProviders>
       </body>
     </html>
   );

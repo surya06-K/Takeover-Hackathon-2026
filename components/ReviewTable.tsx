@@ -1,6 +1,7 @@
 'use client';
 
 import { uid, type EntryType } from '@/lib/types';
+import SpeakButton from './SpeakButton';
 
 /**
  * Editable representation of an extracted row: qty/amount stay strings while
@@ -174,7 +175,13 @@ function RowPair({
       </tr>
       {row.raw_text && (
         <tr className={`raw-line ${cls}`}>
-          <td colSpan={7}>as written: “{row.raw_text}”</td>
+          <td colSpan={6}>as written: “{row.raw_text}”</td>
+          <td>
+            <SpeakButton
+              compact
+              text={[row.party, row.item, row.amount ? `${row.amount} rupees` : ''].filter(Boolean).join(', ')}
+            />
+          </td>
         </tr>
       )}
     </>

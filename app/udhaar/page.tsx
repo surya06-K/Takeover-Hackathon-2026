@@ -2,11 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import VoiceInput from '@/components/VoiceInput';
+import SpeakButton from '@/components/SpeakButton';
+import { useA11y } from '@/components/AccessibilityProvider';
+import { speakAmount } from '@/lib/i18n';
 import { FLAG_THRESHOLD, formatINR } from '@/lib/ledger';
 import { formatPhone } from '@/lib/phone';
 import type { PartyWithBalance } from '@/lib/db/types';
 
 export default function UdhaarPage() {
+  const { tr, locale } = useA11y();
   const [parties, setParties] = useState<PartyWithBalance[] | null>(null);
   const [q, setQ] = useState('');
 
@@ -35,55 +40,68 @@ export default function UdhaarPage() {
   return (
     <div className="container">
       <div className="page-head" style={{ paddingTop: 26 }}>
-        <h1>Udhaar khata</h1>
+        <h1>{tr('udhaarKhata')}</h1>
         <p>
-          {parties ? `${parties.length} parties · ${formatINR(totalDue)} to collect` : 'loading…'}
+          {parties
+            ? `${parties.length} ${tr('parties')} · ${formatINR(totalDue)} ${tr('toCollect')}`
+            : tr('loading')}
         </p>
       </div>
 
-      <input
-        className="search-input"
-        placeholder="🔍  Search name or phone number…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        aria-label="Search parties by name or phone"
-      />
+      <div className="search-row">
+        <input
+          className="search-input"
+          placeholder={`🔍  ${tr('searchPlaceholder')}`}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          aria-label={tr('searchAria')}
+        />
+        <VoiceInput mode="name" onResult={(text) => setQ(text)} />
+      </div>
 
       {filtered && filtered.length === 0 && (
         <div className="card" style={{ textAlign: 'center', color: 'var(--muted)' }}>
-          {q
-            ? 'No party matches that search.'
-            : 'No parties yet — scan a register page or add entries from a party profile.'}
+          {q ? tr('noSearchMatch') : tr('noParties')}
         </div>
       )}
 
-      {filtered?.map((p) => (
-        <Link key={p.id} href={`/party/${p.id}`} className="party-row">
-          <span className={`party-pic ${p.balance <= 0 ? 'green' : ''}`}>{initials(p.name)}</span>
-          <span className="party-mid">
-            <span className="party-name-row">
-              {p.name}
-              {p.balance >= FLAG_THRESHOLD && <span className="badge-red">₹5,000+ due</span>}
+      {filtered?.map((p) => {
+        const status =
+          p.balance > 0 ? tr('due') : p.balance === 0 ? tr('settled') : tr('advance');
+        const speakText = `${p.name}, ${speakAmount(Math.abs(p.balance), locale)} ${status}`;
+
+        return (
+          <Link key={p.id} href={`/party/${p.id}`} className="party-row">
+            <span className={`party-pic ${p.balance <= 0 ? 'green' : ''}`}>{initials(p.name)}</span>
+            <span className="party-mid">
+              <span className="party-name-row">
+                {p.name}
+                {p.balance >= FLAG_THRESHOLD && (
+                  <span className="badge-red">{tr('flaggedDue')}</span>
+                )}
+              </span>
+              <span className="party-sub">
+                {p.phone ? `📱 ${formatPhone(p.phone)}` : tr('noPhone')} · {p.entries}{' '}
+                {p.entries === 1 ? tr('entry') : tr('entries')}
+              </span>
             </span>
-            <span className="party-sub">
-              {p.phone ? `📱 ${formatPhone(p.phone)}` : 'no phone saved'} · {p.entries} entries
+            <span
+              className={`party-amt ${p.balance > 0 ? 'amt-due' : p.balance === 0 ? 'amt-zero' : 'amt-adv'}`}
+            >
+              {formatINR(Math.abs(p.balance))}
+              <span className="lbl">{status}</span>
             </span>
-          </span>
-          <span
-            className={`party-amt ${p.balance > 0 ? 'amt-due' : p.balance === 0 ? 'amt-zero' : 'amt-adv'}`}
-          >
-            {formatINR(Math.abs(p.balance))}
-            <span className="lbl">{p.balance > 0 ? 'due' : p.balance === 0 ? 'settled' : 'advance'}</span>
-          </span>
-        </Link>
-      ))}
+            <SpeakButton compact text={speakText} />
+          </Link>
+        );
+      })}
 
       <div className="actions-row" style={{ marginTop: 20 }}>
         <a href="/api/export?format=csv" className="btn btn-ghost">
-          ⬇ Export CSV
+          ⬇ {tr('exportCsv')}
         </a>
         <a href="/api/export?format=json" className="btn btn-ghost">
-          ⬇ Export JSON
+          ⬇ {tr('exportJson')}
         </a>
       </div>
     </div>

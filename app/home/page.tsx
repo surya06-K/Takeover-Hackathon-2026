@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import SpeakButton from '@/components/SpeakButton';
+import { useA11y } from '@/components/AccessibilityProvider';
+import { speakAmount } from '@/lib/i18n';
 import { formatINR } from '@/lib/ledger';
 import { formatPhone } from '@/lib/phone';
 
@@ -20,6 +23,7 @@ interface DashData {
 
 export default function HomePage() {
   const router = useRouter();
+  const { tr, locale, say, voiceHelp } = useA11y();
   const [shop, setShop] = useState<{ name: string } | null>(null);
   const [storage, setStorage] = useState<'memory' | 'supabase'>('memory');
   const [data, setData] = useState<DashData | null>(null);
@@ -38,7 +42,13 @@ export default function HomePage() {
     })();
   }, [router]);
 
-  const today = new Date().toLocaleDateString('en-IN', {
+  useEffect(() => {
+    if (!voiceHelp || !data) return;
+    const outstanding = speakAmount(data.stats.outstanding, locale);
+    say(`${tr('outstanding')}: ${outstanding}`);
+  }, [data, voiceHelp]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const today = new Date().toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-IN', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -47,31 +57,41 @@ export default function HomePage() {
   return (
     <div className="container">
       <div className="hello-row">
-        <h1>Namaste{shop ? `, ${firstWord(shop.name)} ji` : ''} 🙏</h1>
+        <h1>
+          {tr('namaste')}
+          {shop ? `, ${firstWord(shop.name)} ${tr('ji')}` : ''} 🙏
+        </h1>
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
           {today}
           {shop ? ` · ${shop.name}` : ''}
           <span className={`storage-chip ${storage === 'supabase' ? 'db' : ''}`}>
-            {storage === 'supabase' ? 'DB connected' : 'demo storage'}
+            {storage === 'supabase' ? tr('dbConnected') : tr('demoStorage')}
           </span>
         </p>
       </div>
 
       <div className="cards-grid" style={{ gridTemplateColumns: '1fr 1fr', margin: '16px 0 20px' }}>
-        <div className="stat-card">
-          <div className="stat-label">Outstanding</div>
+        <div className="stat-card stat-card-speak">
+          <div className="stat-label">{tr('outstanding')}</div>
           <div className="stat-value money">{formatINR(data?.stats.outstanding ?? 0)}</div>
-          <div className="stat-sub">{data?.stats.partyCount ?? 0} parties</div>
+          <div className="stat-sub">
+            {data?.stats.partyCount ?? 0} {tr('parties')}
+          </div>
+          <SpeakButton
+            compact
+            text={`${tr('outstanding')}: ${speakAmount(data?.stats.outstanding ?? 0, locale)}`}
+          />
         </div>
-        <div className="stat-card">
-          <div className="stat-label">₹5,000+ due</div>
+        <div className="stat-card stat-card-speak">
+          <div className="stat-label">{tr('flaggedDue')}</div>
           <div className="stat-value" style={{ color: 'var(--red)' }}>
-            {data?.stats.flaggedCount ?? 0} {data?.stats.flaggedCount === 1 ? 'party' : 'parties'}
+            {data?.stats.flaggedCount ?? 0}{' '}
+            {data?.stats.flaggedCount === 1 ? tr('party') : tr('parties')}
           </div>
           <div className="stat-sub">
             {data?.stats.biggestDebtor
-              ? `top: ${data.stats.biggestDebtor.name}`
-              : 'nobody flagged'}
+              ? `${tr('topDebtor')}: ${data.stats.biggestDebtor.name}`
+              : tr('nobodyFlagged')}
           </div>
         </div>
       </div>
@@ -79,7 +99,7 @@ export default function HomePage() {
       {data && data.collectToday.length > 0 && (
         <>
           <label className="field-label" style={{ marginTop: 8 }}>
-            Collect today
+            {tr('collectToday')}
           </label>
           {data.collectToday.map((p) => (
             <Link key={p.id} href={`/party/${p.id}`} className="party-row">
@@ -90,21 +110,25 @@ export default function HomePage() {
                 </span>
                 <span className="party-sub">
                   {p.phone ? `📱 ${formatPhone(p.phone)} · ` : ''}
-                  {p.entries} entries
+                  {p.entries} {p.entries === 1 ? tr('entry') : tr('entries')}
                 </span>
               </span>
               <span className="party-amt amt-due">{formatINR(p.balance)}</span>
+              <SpeakButton
+                compact
+                text={`${p.name}, ${speakAmount(p.balance, locale)} ${tr('due')}`}
+              />
             </Link>
           ))}
         </>
       )}
 
       <label className="field-label" style={{ marginTop: 14 }}>
-        Recent activity
+        {tr('recentActivity')}
       </label>
       {(!data || data.recent.length === 0) && (
         <div className="card" style={{ textAlign: 'center', color: 'var(--muted)' }}>
-          Nothing yet — tap <b>Scan</b> below and photograph your first register page.
+          {tr('emptyHome')}
         </div>
       )}
       {data?.recent.map((r, i) => (

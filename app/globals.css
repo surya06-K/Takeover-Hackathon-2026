@@ -1468,3 +1468,313 @@ h1, h2, h3 {
   font-size: 13px;
   color: var(--muted);
 }
+
+/* ========================= accessibility / literacy ====================== */
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 58px;
+  gap: 8px;
+}
+
+.a11y-toolbar {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.a11y-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.a11y-chip.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.a11y-chip:active {
+  transform: scale(0.96);
+}
+
+.speak-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.speak-btn-compact {
+  padding: 8px;
+  min-width: 40px;
+  min-height: 40px;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.speak-btn-compact span {
+  display: none;
+}
+
+.voice-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  background: var(--accent-soft);
+  font-size: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.voice-btn.listening {
+  animation: pulse-mic 1s ease-in-out infinite;
+  background: var(--amber-soft);
+  border-color: var(--amber);
+}
+
+@keyframes pulse-mic {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.search-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 14px;
+}
+
+.search-row .search-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.stat-card-speak {
+  position: relative;
+}
+
+.stat-card-speak .speak-btn-compact {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.party-row {
+  position: relative;
+}
+
+.party-row .speak-btn-compact {
+  margin-left: 4px;
+}
+
+.balance-hero-speak {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Visual number pad for amounts */
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.numpad-key {
+  min-height: 52px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.numpad-key:active {
+  background: var(--paper-deep);
+  transform: scale(0.97);
+}
+
+.numpad-ok {
+  background: var(--green-soft);
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.numpad-del {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.amount-display {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 650;
+  text-align: center;
+  padding: 12px;
+  background: var(--paper-deep);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.entry-tools {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.entry-card .btn-lg {
+  min-height: 52px;
+  font-size: 17px;
+}
+
+/* Onboarding overlay */
+.onboard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(38, 32, 25, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+}
+
+.onboard-card {
+  background: var(--card);
+  border-radius: 20px 20px 16px 16px;
+  padding: 28px 22px 22px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.onboard-icon {
+  font-size: 56px;
+  margin-bottom: 8px;
+}
+
+.onboard-step-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 650;
+  margin: 8px 0;
+}
+
+.onboard-desc {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.onboard-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.onboard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.onboard-dot.active {
+  background: var(--accent);
+  width: 22px;
+  border-radius: 999px;
+}
+
+.onboard-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Large text mode for low vision / low literacy */
+html.large-text {
+  font-size: 19px;
+}
+
+html.large-text .tab-item {
+  font-size: 13px;
+}
+
+html.large-text .tab-scan {
+  width: 68px;
+  height: 68px;
+  font-size: 28px;
+}
+
+html.large-text .btn-lg {
+  min-height: 58px;
+  font-size: 19px;
+}
+
+html.large-text .party-name-row {
+  font-size: 18px;
+}
+
+html.large-text .party-amt {
+  font-size: 18px;
+}
+
+html.large-text .numpad-key {
+  min-height: 60px;
+  font-size: 26px;
+}
+
+html.large-text .amount-display {
+  font-size: 42px;
+}
+
+html.large-text h1 {
+  font-size: 1.55em;
+}
+
+.tab-label {
+  display: block;
+}
+
+.tl-t1 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+

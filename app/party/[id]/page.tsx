@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import NumPad from '@/components/NumPad';
+import SpeakButton from '@/components/SpeakButton';
+import VoiceInput from '@/components/VoiceInput';
+import { useA11y } from '@/components/AccessibilityProvider';
+import { speakAmount } from '@/lib/i18n';
 import { formatINR } from '@/lib/ledger';
 import { formatPhone } from '@/lib/phone';
 import type { Party, TxnType } from '@/lib/db/types';
@@ -26,20 +31,29 @@ interface ProfileData {
 export default function PartyPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { tr, locale, feedbackSuccess, feedbackError, say, voiceHelp } = useA11y();
   const [data, setData] = useState<ProfileData | null>(null);
   const [error, setError] = useState('');
   const [entry, setEntry] = useState<{ type: TxnType; amount: string; item: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [usePad, setUsePad] = useState(true);
 
   const load = useCallback(async () => {
     const j = await fetch(`/api/parties/${id}`).then((r) => r.json()).catch(() => null);
     if (j?.ok) setData(j);
-    else setError(j?.error ?? 'Could not load this party.');
-  }, [id]);
+    else setError(j?.error ?? tr('errorGeneric'));
+  }, [id, tr]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!voiceHelp || !data) return;
+    const bal = data.stats.balance;
+    const label = bal >= 0 ? tr('balanceDue') : tr('advanceHeld');
+    say(`${data.party.name}. ${label}: ${speakAmount(Math.abs(bal), locale)}`);
+  }, [data, voiceHelp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveEntry() {
     if (!entry) return;
@@ -57,11 +71,14 @@ export default function PartyPage() {
       });
       const json = await res.json();
       if (!json.ok) {
-        setError(json.error ?? 'Could not save.');
+        setError(json.error ?? tr('errorGeneric'));
+        feedbackError();
         return;
       }
       setEntry(null);
       setError('');
+      feedbackSuccess();
+      await say(tr('saved'));
       await load();
     } finally {
       setBusy(false);
@@ -74,7 +91,7 @@ export default function PartyPage() {
         <div className="card error-card">
           <h2>{error}</h2>
           <button type="button" className="btn btn-ghost" onClick={() => router.push('/udhaar')}>
-            ← Back to Udhaar
+            ← {tr('backToUdhaar')}
           </button>
         </div>
       </div>
@@ -86,13 +103,15 @@ export default function PartyPage() {
       <div className="container section">
         <div className="card loading-card">
           <div className="scan-dot" aria-hidden />
-          <div className="loading-msg">Opening khata…</div>
+          <div className="loading-msg">{tr('openingKhata')}</div>
         </div>
       </div>
     );
   }
 
   const { party, stats, txns } = data;
+  const balanceLabel = stats.balance >= 0 ? tr('balanceDue') : tr('advanceHeld');
+  const balanceSpeak = `${party.name}. ${balanceLabel}: ${speakAmount(Math.abs(stats.balance), locale)}`;
 
   return (
     <div className="container">
@@ -101,30 +120,28 @@ export default function PartyPage() {
         <div>
           <h1>{party.name}</h1>
           <div className="profile-phone">
-            {party.phone ? `📱 ${formatPhone(party.phone)}` : 'no phone saved'}
-            {party.nameVariants.length > 0 && (
-              <span className="muted"> · also written: {party.nameVariants.join(', ')}</span>
-            )}
+            {party.phone ? `📱 ${formatPhone(party.phone)}` : tr('noPhone')}
           </div>
         </div>
         {party.phone && (
           <a className="call-btn" href={`tel:+91${party.phone}`}>
-            📞 Call
+            📞 {tr('call')}
           </a>
         )}
       </div>
 
-      <div className="balance-hero">
+      <div className="balance-hero balance-hero-speak">
         <div>
-          <div className="stat-label">{stats.balance >= 0 ? 'Balance due' : 'Advance held'}</div>
+          <div className="stat-label">{balanceLabel}</div>
           <div className={`v ${stats.balance === 0 ? 'settled' : ''}`}>
             {formatINR(Math.abs(stats.balance))}
           </div>
         </div>
+        <SpeakButton compact text={balanceSpeak} />
         <div className="muted" style={{ fontSize: 12, textAlign: 'right' }}>
-          auto-updated
+          {tr('autoUpdated')}
           <br />
-          from {stats.entries} entr{stats.entries === 1 ? 'y' : 'ies'}
+          {stats.entries} {stats.entries === 1 ? tr('entry') : tr('entries')}
         </div>
       </div>
 
@@ -132,50 +149,79 @@ export default function PartyPage() {
         <div className="two-actions">
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary btn-lg"
             onClick={() => setEntry({ type: 'credit', amount: '', item: '' })}
           >
-            + Udhaar diya
+            {tr('udhaarDiya')}
           </button>
           <button
             type="button"
-            className="btn btn-ghost"
+            className="btn btn-ghost btn-lg"
             onClick={() => setEntry({ type: 'payment', amount: '', item: '' })}
           >
-            ₹ Payment aaya
+            {tr('paymentAaya')}
           </button>
         </div>
       ) : (
-        <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card entry-card" style={{ marginBottom: 18 }}>
           <label className="form-label" style={{ marginTop: 0 }}>
-            {entry.type === 'credit' ? 'Udhaar amount (₹)' : 'Payment received (₹)'}
+            {entry.type === 'credit' ? tr('udhaarAmount') : tr('paymentReceived')}
           </label>
+
+          <div className="amount-display">{entry.amount || '0'}</div>
+
+          <div className="entry-tools">
+            <VoiceInput
+              mode="number"
+              label={tr('voiceAmount')}
+              onResult={(text) => setEntry({ ...entry, amount: text })}
+            />
+            <button
+              type="button"
+              className="a11y-chip"
+              onClick={() => setUsePad((v) => !v)}
+            >
+              {usePad ? '⌨️' : '🔢'}
+            </button>
+          </div>
+
+          {usePad && (
+            <NumPad
+              value={entry.amount}
+              onChange={(amount) => setEntry({ ...entry, amount })}
+              onConfirm={saveEntry}
+            />
+          )}
+
+          {!usePad && (
+            <input
+              className="form-input"
+              inputMode="decimal"
+              autoFocus
+              placeholder="0"
+              value={entry.amount}
+              onChange={(e) => setEntry({ ...entry, amount: e.target.value })}
+            />
+          )}
+
+          <label className="form-label">{tr('itemNote')}</label>
           <input
             className="form-input"
-            inputMode="decimal"
-            autoFocus
-            placeholder="0"
-            value={entry.amount}
-            onChange={(e) => setEntry({ ...entry, amount: e.target.value })}
-          />
-          <label className="form-label">Item / note (optional)</label>
-          <input
-            className="form-input"
-            placeholder={entry.type === 'credit' ? 'e.g. Atta 10kg' : 'e.g. cash / UPI'}
+            placeholder={entry.type === 'credit' ? 'Atta 10kg' : 'cash / UPI'}
             value={entry.item}
             onChange={(e) => setEntry({ ...entry, item: e.target.value })}
           />
           <div className="two-actions" style={{ marginTop: 14, marginBottom: 0 }}>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary btn-lg"
               disabled={busy || !parseFloat(entry.amount)}
               onClick={saveEntry}
             >
-              Save entry
+              {tr('saveEntry')}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setEntry(null)}>
-              Cancel
+              {tr('cancel')}
             </button>
           </div>
           {error && <div className="form-error">{error}</div>}
@@ -183,34 +229,44 @@ export default function PartyPage() {
       )}
 
       <label className="field-label" style={{ marginTop: 4 }}>
-        Timeline
+        {tr('timeline')}
       </label>
       {txns.length === 0 && (
         <div className="card" style={{ textAlign: 'center', color: 'var(--muted)' }}>
-          No entries yet.
+          {tr('noEntries')}
         </div>
       )}
       <div className="timeline">
-        {txns.map((t) => (
-          <div key={t.id} className={`tl-event ${t.type === 'payment' ? 'pay' : ''}`}>
-            <div className="tl-t1">
-              <span className={t.type === 'payment' ? 'py' : 'cr'}>
-                {t.type === 'payment' ? 'Payment' : 'Credit'} {formatINR(t.amount)}
-              </span>
-              {t.item ? ` — ${t.item}` : ''}
-            </div>
-            <div className="tl-t2">
-              {t.txnDate ?? new Date(t.createdAt).toLocaleDateString('en-IN')}
-              {' · '}
-              {t.pageNumber != null ? (
-                <span className="src-chip">📷 page {t.pageNumber}</span>
-              ) : (
-                <span className="src-chip">✍️ manual</span>
+        {txns.map((t) => {
+          const typeLabel = t.type === 'payment' ? tr('payment') : tr('credit');
+          const speakLine = `${typeLabel} ${speakAmount(t.amount, locale)}${t.item ? `, ${t.item}` : ''}`;
+
+          return (
+            <div key={t.id} className={`tl-event ${t.type === 'payment' ? 'pay' : ''}`}>
+              <div className="tl-t1">
+                <span className={t.type === 'payment' ? 'py' : 'cr'}>
+                  {typeLabel} {formatINR(t.amount)}
+                </span>
+                {t.item ? ` — ${t.item}` : ''}
+                <SpeakButton compact text={speakLine} />
+              </div>
+              <div className="tl-t2">
+                {t.txnDate ?? new Date(t.createdAt).toLocaleDateString('en-IN')}
+                {' · '}
+                {t.pageNumber != null ? (
+                  <span className="src-chip">📷 page {t.pageNumber}</span>
+                ) : (
+                  <span className="src-chip">✍️ manual</span>
+                )}
+              </div>
+              {t.rawText && (
+                <div className="tl-raw">
+                  {tr('asWritten')}: “{t.rawText}”
+                </div>
               )}
             </div>
-            {t.rawText && <div className="tl-raw">as written: “{t.rawText}”</div>}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
