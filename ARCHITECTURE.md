@@ -4,11 +4,11 @@ This document explains how KaagazAI turns a photo of a handwritten register into
 
 ## System overview
 
-KaagazAI is a single Next.js 14 (App Router) application. All the intelligence lives in one server route; everything else is thin client UI and small pure-function libraries.
+KaagazAI is a single Next.js 14 (App Router) application: a phone-first khata app whose data-entry method is the camera. The AI intelligence lives in one extraction route; the khata lives behind a small store facade; everything else is thin client UI and pure-function libraries.
 
 ```
-Browser (mobile-first)                       Server (Next.js API route)
-──────────────────────                       ──────────────────────────
+Browser (mobile-first)                       Server (Next.js API routes)
+──────────────────────                       ───────────────────────────
 photo → canvas downscale       POST          /api/extract
   max 1600px, JPEG 0.85   ───────────▶   1. Gemini 2.5 Flash (vision)
                           base64 JSON    2. on any error → Groq
@@ -16,11 +16,17 @@ review table (human                         Llama 4 Scout (vision)
   approves every row)     ◀───────────   3. no keys → labelled sample data
         │                  strict JSON      + defensive JSON parsing
         ▼
-in-memory ledger store  (module state + useSyncExternalStore)
-        │
-        ▼
-dashboard + CSV/JSON export (client-side Blob download)
+match-parties step             POST       /api/pages/commit
+  (names → saved parties, ───────────▶     resolve/create parties,
+   or new party + phone)                   insert transactions
+                                                │
+home · udhaar · party          GET              ▼
+  balances, timelines,    ◀───────────   lib/db store facade
+  phone search            /api/…         ├─ Supabase Postgres (configured)
+                                         └─ in-memory fallback (zero-config)
 ```
+
+Auth is a phone-OTP flow (demo OTP `123456`, no SMS provider in the loop) issuing an HMAC-signed session cookie; every data route resolves the shop from that cookie.
 
 The design has one guiding principle: **handwriting OCR will make mistakes, so the human — not the model — is the source of truth.** Nothing is saved until the shopkeeper approves it, and no value is ever invented on their behalf.
 
@@ -68,26 +74,34 @@ The result is that the UI **never sees malformed data**, regardless of which mod
 
 The parsed rows render in an editable table. Every cell is editable; rows can be added or deleted. Under each row, the model's `raw_text` is shown so the shopkeeper can compare against exactly what the model saw.
 
-A **low-confidence heuristic** highlights rows in amber when the amount is missing, or when neither party nor item could be read — precisely the rows worth a second look. A badge names the reader (`Gemini 2.5 Flash`, `Llama 4 Scout · Groq failover`, or `Sample data — no API key set`). Only on **Confirm & Save** does the page enter the ledger.
+A **low-confidence heuristic** highlights rows in amber when the amount is missing, or when neither party nor item could be read — precisely the rows worth a second look. A badge names the reader (`Gemini 2.5 Flash`, `Llama 4 Scout · Groq failover`, or `Sample data — no API key set`). Approving the review leads to the match-parties step — nothing has been saved yet.
 
-### 5. Ledger store (`lib/store.ts`)
+### 5. Match parties (`app/scan/page.tsx`, match phase)
 
-Saved pages live in an **in-memory** module-level store, exposed to React via `useSyncExternalStore` so the dashboard stays in sync across navigation. This is deliberately `localStorage`-free — see [Design decisions](#design-decisions). Each page carries its `pageNumber`, the `model` that read it, register type, confidence, notes, and rows with stable ids.
+Handwriting doesn't come with customer IDs. The distinct party names on the reviewed page are grouped (with entry counts and page totals) and each is resolved by the shopkeeper:
 
-### 6. Balances and dashboard (`lib/ledger.ts`, `app/ledger/page.tsx`)
+- **Pre-selected existing party** when the name — or a previously saved *variant* — matches (case-insensitive). This is how *"रमेश यादव"* on page 2 lands on the same party as page 1.
+- **Create new party**, with an optional phone number — the identity key of the khata.
 
-`computeBalances` walks every row of every saved page and aggregates party-wise:
+When an extracted spelling differs from the saved party name, it is stored in the party's `name_variants`, so cross-script matches get better with every page. In an udhaar khata, `sale` rows are treated as goods given on credit; rows without a party, amount or udhaar type are skipped with a visible notice (and never guessed).
 
-- `credit` and `sale` **increase** what a party owes;
-- `payment` **decreases** it;
-- untyped rows are **counted but never guessed** into a direction;
-- rows with no party or no amount are excluded from balances (but still exported).
+### 6. Persistence (`lib/db`, `/api/pages/commit`)
 
-Balances are sorted by amount due. `totalOutstanding` sums positive balances; `biggestDebtor` returns the top party if they owe anything; any party at or above the **₹5,000** `FLAG_THRESHOLD` gets a red flag. All amounts render through an `en-IN` `Intl.NumberFormat` for correct Indian-style grouping.
+`POST /api/pages/commit` writes one atomic unit: a `pages` record (model, register type, confidence, notes) plus one `transactions` row per approved entry, each linking `party_id` and `page_id`.
 
-### 7. Export (`lib/export.ts`)
+The store behind it is a facade with two interchangeable implementations:
 
-CSV and JSON are serialized client-side and downloaded via a `Blob`, so export works with no backend round-trip and no data leaving the browser.
+- **Supabase Postgres** (`lib/db/supabase.ts`) when env keys are present — schema in `supabase/schema.sql`, accessed server-side only with the service-role key (RLS stays deny-by-default).
+- **In-memory** (`lib/db/memory.ts`) otherwise — zero-config local demos, honestly badged *"demo storage"* in the UI.
+
+**Balances are never stored.** A party's balance is always `Σ credits − Σ payments` computed from their transactions (`computeBalanceFields`), so scanning a page updates every affected balance automatically, and any balance can be explained by walking its timeline back to photographed pages. Any party at or above the **₹5,000** `FLAG_THRESHOLD` gets a red flag; amounts render through an `en-IN` `Intl.NumberFormat`.
+
+### 7. Lookup, timeline, export
+
+- `GET /api/parties?q=` searches by name, saved variant, **or phone digits** — the "who is this caller?" feature.
+- `GET /api/parties/:id` returns the profile plus a timeline where every transaction carries its source: *📷 page N* (with the original `raw_text` handwriting) or *✍️ manual*.
+- Manual entries (`+ Udhaar diya` / `₹ Payment aaya`) post to `/api/transactions`.
+- `GET /api/export?format=csv|json` streams the full khata server-side; the CSV is prefixed with a UTF-8 BOM so Excel/Numbers render Hindi and Telugu correctly.
 
 ## Design decisions
 
@@ -99,26 +113,33 @@ CSV and JSON are serialized client-side and downloaded via a `Blob`, so export w
 
 **Payload discipline.** On-device downscaling keeps requests small and fast on the connections real shopkeepers actually have.
 
-**In-memory by design.** For a demo, a clean slate on refresh is a feature, not a bug — no stale state, no privacy questions about persisted financial data. Swapping `lib/store.ts` for a real database is the obvious production next step and is isolated to that one file.
+**Storage behind a facade.** Every screen talks to the same `KaagazStore` interface; whether it's Supabase Postgres or the in-process fallback is a deployment detail decided by env vars. The fallback keeps local demos zero-config and honest (badged in the UI); Supabase makes the deployed khata durable. Swapping in another database means implementing one interface in one file.
 
-**Keys stay on the server.** API keys are read only inside the `/api/extract` route and are never shipped to the browser.
+**The phone number is the identity key.** Names on paper are ambiguous across scripts and spellings; a phone number isn't. Parties are unique per shop by phone, name variants accumulate on top, and search treats digits as first-class.
+
+**Keys stay on the server.** AI keys, the Supabase service-role key and the session secret are read only inside API routes and are never shipped to the browser.
 
 ## Key files
 
 | File | Role |
 |---|---|
-| `app/api/extract/route.ts` | Vision extraction: Gemini → Groq failover, JSON hardening, sample fallback. **API keys live here only.** |
-| `app/digitize/page.tsx` | Upload → loading → review → error state machine |
+| `app/api/extract/route.ts` | Vision extraction: Gemini → Groq failover, JSON hardening, sample fallback |
+| `app/scan/page.tsx` | Capture → loading → review → **match parties** → commit state machine |
 | `components/ReviewTable.tsx` | Editable human-in-the-loop table, amber low-confidence rows |
-| `app/ledger/page.tsx` | Merged dashboard: balances, cards, ₹5,000+ flags, exports |
-| `lib/store.ts` | In-memory ledger (deliberately `localStorage`-free) |
-| `lib/ledger.ts` | Balance math: credit + sale add, payment subtracts |
+| `app/api/pages/commit/route.ts` | Scan → khata bridge: resolve/create parties, insert transactions |
+| `lib/db/` | Store facade: domain types, Supabase impl, in-memory fallback |
+| `supabase/schema.sql` | One-paste Postgres schema (shops, parties, transactions, pages) |
+| `app/home` · `app/udhaar` · `app/party/[id]` | Dashboard, searchable khata, party profile + timeline |
+| `app/api/auth/…` + `lib/session.ts` | Phone OTP (demo code) and HMAC-signed session cookie |
+| `lib/ledger.ts` · `lib/phone.ts` | Balance math + ₹ formatting · phone normalization |
 | `lib/image.ts` | Client-side canvas downscale before upload |
-| `lib/export.ts` | CSV / JSON serialization + download |
-| `lib/types.ts` | Shared types and the strict-JSON contract |
+| `lib/types.ts` | Extraction types and the strict-JSON contract |
 
 ## Limitations (honest ones)
 
-- The ledger is in-memory by design for the demo — a hard refresh starts fresh.
+- Without Supabase keys the khata lives in process memory — great for local demos, wiped on restart, and not durable on serverless. The UI says so ("demo storage").
+- Login uses a fixed demo OTP (`123456`); production would flip to a real SMS provider behind the same two endpoints.
+- Party matching pre-selects exact name/variant matches only; fuzzy and transliterated auto-matching is the natural next step (the `/api/translate` failover chain is already in place for it).
 - Page-level confidence comes from the model; row-level confidence is a heuristic.
 - HEIC photos work only where the browser can decode them (Safari / iOS does).
+- Sales and Stock are visible coming-soon tabs — same scan pipeline, different target tables.
