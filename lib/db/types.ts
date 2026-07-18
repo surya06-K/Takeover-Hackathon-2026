@@ -1,5 +1,4 @@
 /** Domain model for the khata (persistent ledger). */
-import type { Section } from '@/lib/register';
 
 export interface Shop {
   id: string;
@@ -75,6 +74,19 @@ export interface StockEntry {
   createdAt: string;
 }
 
+/** Per-item "remind me at" quantity level for the stock register. */
+export interface StockReminder {
+  shopId: string;
+  itemKey: string; // stockItemKey(item) — matches the /api/stock aggregation key
+  minQty: number;
+  updatedAt: string;
+}
+
+/** Canonical key for a stock item — the same key /api/stock aggregates by. */
+export function stockItemKey(item: string): string {
+  return item.trim().toLowerCase();
+}
+
 /** Party + computed balance for lists. */
 export interface PartyWithBalance extends Party {
   credits: number;
@@ -130,17 +142,19 @@ export interface CommitStockRowInput {
   rawText: string | null;
 }
 
+/**
+ * One scanned page can carry rows for more than one section at once (a
+ * kirana register often mixes udhaar, cash sales and stock movements) — each
+ * row was already routed to its bucket client-side by its AI-detected type,
+ * so a single commit can populate all three in one atomic page record.
+ */
 export interface CommitPageInput {
-  section: Section;
   model: string;
   registerType: string;
   confidence: number;
   notes: string;
-  /** Present when section === 'udhaar' */
   rows?: CommitRowInput[];
-  /** Present when section === 'sales' */
   saleRows?: CommitSaleRowInput[];
-  /** Present when section === 'stock' */
   stockRows?: CommitStockRowInput[];
 }
 
@@ -182,6 +196,11 @@ export interface KaagazStore {
     entries: Omit<StockEntry, 'id' | 'shopId' | 'createdAt'>[]
   ): Promise<StockEntry[]>;
   listStock(shopId: string): Promise<StockEntry[]>;
+
+  // restock reminders
+  listStockReminders(shopId: string): Promise<StockReminder[]>;
+  /** Upsert the reminder level for an item; null clears it. */
+  setStockReminder(shopId: string, itemKey: string, minQty: number | null): Promise<void>;
 }
 
 export function computeBalanceFields(txns: Txn[]): {

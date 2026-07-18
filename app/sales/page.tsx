@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import SpeakButton from '@/components/SpeakButton';
+import { useLang } from '@/components/LanguageProvider';
 import { formatINR } from '@/lib/ledger';
 
 interface SaleRow {
@@ -22,6 +24,7 @@ interface SalesData {
 }
 
 export default function SalesPage() {
+  const { tr } = useLang();
   const [data, setData] = useState<SalesData | null>(null);
 
   useEffect(() => {
@@ -35,39 +38,50 @@ export default function SalesPage() {
     return (
       <div className="container section">
         <div className="page-head" style={{ paddingTop: 26 }}>
-          <h1>Sales &amp; bill book</h1>
-          <p>Daily sales from scanned bill-book pages.</p>
+          <h1>{tr('salesTitle')}</h1>
+          <p>{tr('salesSubtitle')}</p>
         </div>
         <div className="card soon-card">
           <div className="big" aria-hidden>
             🧾
           </div>
-          <h2>No sales scanned yet</h2>
-          <p>Photograph a bill book page and pick "Sales" — entries will land here with running totals.</p>
+          <h2>{tr('noSalesTitle')}</h2>
+          <p>{tr('noSalesDesc')}</p>
           <Link href="/scan" className="btn btn-primary btn-lg" style={{ marginTop: 18 }}>
-            📷 Scan a page →
+            📷 {tr('scanPage')} →
           </Link>
         </div>
       </div>
     );
   }
 
+  const spoken = `${tr('todaysSales')} ${formatINR(data?.stats.today ?? 0)}. ${tr('totalSales')} ${formatINR(
+    data?.stats.total ?? 0
+  )}.`;
+
   return (
     <div className="container">
       <div className="page-head" style={{ paddingTop: 26 }}>
-        <h1>Sales &amp; bill book</h1>
-        <p>{data ? `${data.stats.entries} entries · ${formatINR(data.stats.total)} total` : 'loading…'}</p>
+        <h1>{tr('salesTitle')}</h1>
+        <p>
+          {data
+            ? `${data.stats.entries} ${tr('entries')} · ${formatINR(data.stats.total)} ${tr('total')}`
+            : tr('loading')}
+          {data && <SpeakButton text={spoken} compact />}
+        </p>
       </div>
 
       <div className="cards-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div className="stat-card">
-          <div className="stat-label">Today's sales</div>
+          <div className="stat-label">{tr('todaysSales')}</div>
           <div className="stat-value money">{formatINR(data?.stats.today ?? 0)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Total sales</div>
+          <div className="stat-label">{tr('totalSales')}</div>
           <div className="stat-value money">{formatINR(data?.stats.total ?? 0)}</div>
-          <div className="stat-sub">{data?.stats.entries ?? 0} entries</div>
+          <div className="stat-sub">
+            {data?.stats.entries ?? 0} {tr('entries')}
+          </div>
         </div>
       </div>
 
@@ -75,27 +89,27 @@ export default function SalesPage() {
         <table className="balances-table">
           <thead>
             <tr>
-              <th>Party</th>
-              <th>Item</th>
-              <th className="num">Qty</th>
-              <th className="num">Amount</th>
-              <th>Date</th>
-              <th>Source</th>
+              <th>{tr('colParty')}</th>
+              <th>{tr('colItem')}</th>
+              <th className="num">{tr('colQty')}</th>
+              <th className="num">{tr('colAmount')}</th>
+              <th>{tr('colDate')}</th>
+              <th>{tr('colSource')}</th>
             </tr>
           </thead>
           <tbody>
             {data?.entries.map((e) => (
               <tr key={e.id}>
-                <td>{e.partyName || <span className="muted">walk-in</span>}</td>
+                <td>{e.partyName || <span className="muted">{tr('walkIn')}</span>}</td>
                 <td>{e.item || <span className="muted">—</span>}</td>
                 <td className="num">{e.qty ?? '—'}</td>
                 <td className="num">{formatINR(e.amount)}</td>
                 <td>{e.txnDate ?? new Date(e.createdAt).toLocaleDateString('en-IN')}</td>
                 <td>
                   {e.pageNumber != null ? (
-                    <span className="src-chip">📷 page {e.pageNumber}</span>
+                    <span className="src-chip">📷 {tr('pageChip')} {e.pageNumber}</span>
                   ) : (
-                    <span className="src-chip">✍️ manual</span>
+                    <span className="src-chip">✍️ {tr('manualChip')}</span>
                   )}
                 </td>
               </tr>
@@ -106,10 +120,10 @@ export default function SalesPage() {
 
       <div className="actions-row">
         <Link href="/scan" className="btn btn-primary">
-          + Scan another page
+          + {tr('scanAnother')}
         </Link>
         <a href="/api/export?format=csv&section=sales" className="btn btn-ghost">
-          ⬇ Export CSV
+          ⬇ {tr('exportCsv')}
         </a>
       </div>
     </div>

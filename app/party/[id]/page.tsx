@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import NumPad from '@/components/NumPad';
 import SpeakButton from '@/components/SpeakButton';
 import VoiceInput from '@/components/VoiceInput';
-import { useA11y } from '@/components/AccessibilityProvider';
-import { speakAmount } from '@/lib/i18n';
+import { useLang } from '@/components/LanguageProvider';
+import { playError, playSuccess } from '@/lib/audio';
 import { formatINR } from '@/lib/ledger';
 import { formatPhone } from '@/lib/phone';
 import type { Party, TxnType } from '@/lib/db/types';
@@ -31,7 +31,7 @@ interface ProfileData {
 export default function PartyPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { tr, locale, feedbackSuccess, feedbackError, say, voiceHelp } = useA11y();
+  const { tr } = useLang();
   const [data, setData] = useState<ProfileData | null>(null);
   const [error, setError] = useState('');
   const [entry, setEntry] = useState<{ type: TxnType; amount: string; item: string } | null>(null);
@@ -47,13 +47,6 @@ export default function PartyPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (!voiceHelp || !data) return;
-    const bal = data.stats.balance;
-    const label = bal >= 0 ? tr('balanceDue') : tr('advanceHeld');
-    say(`${data.party.name}. ${label}: ${speakAmount(Math.abs(bal), locale)}`);
-  }, [data, voiceHelp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveEntry() {
     if (!entry) return;
@@ -72,13 +65,12 @@ export default function PartyPage() {
       const json = await res.json();
       if (!json.ok) {
         setError(json.error ?? tr('errorGeneric'));
-        feedbackError();
+        playError();
         return;
       }
       setEntry(null);
       setError('');
-      feedbackSuccess();
-      await say(tr('saved'));
+      playSuccess();
       await load();
     } finally {
       setBusy(false);
@@ -111,7 +103,7 @@ export default function PartyPage() {
 
   const { party, stats, txns } = data;
   const balanceLabel = stats.balance >= 0 ? tr('balanceDue') : tr('advanceHeld');
-  const balanceSpeak = `${party.name}. ${balanceLabel}: ${speakAmount(Math.abs(stats.balance), locale)}`;
+  const balanceSpoken = `${party.name}. ${balanceLabel} ${formatINR(Math.abs(stats.balance))}.`;
 
   return (
     <div className="container">
@@ -130,14 +122,15 @@ export default function PartyPage() {
         )}
       </div>
 
-      <div className="balance-hero balance-hero-speak">
+      <div className="balance-hero">
         <div>
-          <div className="stat-label">{balanceLabel}</div>
+          <div className="stat-label">
+            {balanceLabel} <SpeakButton text={balanceSpoken} compact />
+          </div>
           <div className={`v ${stats.balance === 0 ? 'settled' : ''}`}>
             {formatINR(Math.abs(stats.balance))}
           </div>
         </div>
-        <SpeakButton compact text={balanceSpeak} />
         <div className="muted" style={{ fontSize: 12, textAlign: 'right' }}>
           {tr('autoUpdated')}
           <br />
@@ -171,18 +164,14 @@ export default function PartyPage() {
           <div className="amount-display">{entry.amount || '0'}</div>
 
           <div className="entry-tools">
-            <VoiceInput
-              mode="number"
-              label={tr('voiceAmount')}
-              onResult={(text) => setEntry({ ...entry, amount: text })}
-            />
             <button
               type="button"
-              className="a11y-chip"
+              className="hdr-chip"
               onClick={() => setUsePad((v) => !v)}
             >
               {usePad ? '⌨️' : '🔢'}
             </button>
+            <VoiceInput mode="number" onResult={(amount) => setEntry({ ...entry, amount })} />
           </div>
 
           {usePad && (
@@ -237,31 +226,29 @@ export default function PartyPage() {
         </div>
       )}
       <div className="timeline">
-        {txns.map((t) => {
-          const typeLabel = t.type === 'payment' ? tr('payment') : tr('credit');
-          const speakLine = `${typeLabel} ${speakAmount(t.amount, locale)}${t.item ? `, ${t.item}` : ''}`;
+        {txns.map((txn) => {
+          const typeLabel = txn.type === 'payment' ? tr('payment') : tr('credit');
 
           return (
-            <div key={t.id} className={`tl-event ${t.type === 'payment' ? 'pay' : ''}`}>
+            <div key={txn.id} className={`tl-event ${txn.type === 'payment' ? 'pay' : ''}`}>
               <div className="tl-t1">
-                <span className={t.type === 'payment' ? 'py' : 'cr'}>
-                  {typeLabel} {formatINR(t.amount)}
+                <span className={txn.type === 'payment' ? 'py' : 'cr'}>
+                  {typeLabel} {formatINR(txn.amount)}
                 </span>
-                {t.item ? ` — ${t.item}` : ''}
-                <SpeakButton compact text={speakLine} />
+                {txn.item ? ` — ${txn.item}` : ''}
               </div>
               <div className="tl-t2">
-                {t.txnDate ?? new Date(t.createdAt).toLocaleDateString('en-IN')}
+                {txn.txnDate ?? new Date(txn.createdAt).toLocaleDateString('en-IN')}
                 {' · '}
-                {t.pageNumber != null ? (
-                  <span className="src-chip">📷 page {t.pageNumber}</span>
+                {txn.pageNumber != null ? (
+                  <span className="src-chip">📷 {tr('pageChip')} {txn.pageNumber}</span>
                 ) : (
-                  <span className="src-chip">✍️ manual</span>
+                  <span className="src-chip">✍️ {tr('manualChip')}</span>
                 )}
               </div>
-              {t.rawText && (
+              {txn.rawText && (
                 <div className="tl-raw">
-                  {tr('asWritten')}: “{t.rawText}”
+                  {tr('asWritten')}: “{txn.rawText}”
                 </div>
               )}
             </div>

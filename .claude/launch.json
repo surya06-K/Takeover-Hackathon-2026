@@ -8,6 +8,12 @@
       "port": 3001
     },
     {
+      "name": "kaagazai-test",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": ["-lc", "export PATH=\"$HOME/.local/node/bin:$PATH\"; cd \"$HOME/Hackathon-KaagazAi\" && export GEMINI_API_KEY='' GROQ_API_KEY='' NEXT_PUBLIC_SUPABASE_URL='' SUPABASE_URL='' SUPABASE_SERVICE_ROLE_KEY='' NEXT_PUBLIC_SUPABASE_ANON_KEY='' KAAGAZ_MOCK=1 && exec npm run dev -- -p 3003"],
+      "port": 3003
+    },
+    {
       "name": "justautomatex",
       "runtimeExecutable": "/bin/zsh",
       "runtimeArgs": ["-lc", "export PATH=\"$HOME/.local/node/bin:$PATH\"; cd \"$HOME/justautomatex\" && exec npm run dev -- -p 3002"],

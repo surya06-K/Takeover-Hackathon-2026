@@ -2,16 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import VoiceInput from '@/components/VoiceInput';
 import SpeakButton from '@/components/SpeakButton';
-import { useA11y } from '@/components/AccessibilityProvider';
-import { speakAmount } from '@/lib/i18n';
+import VoiceInput from '@/components/VoiceInput';
+import { useLang } from '@/components/LanguageProvider';
 import { FLAG_THRESHOLD, formatINR } from '@/lib/ledger';
 import { formatPhone } from '@/lib/phone';
 import type { PartyWithBalance } from '@/lib/db/types';
 
 export default function UdhaarPage() {
-  const { tr, locale } = useA11y();
+  const { tr } = useLang();
   const [parties, setParties] = useState<PartyWithBalance[] | null>(null);
   const [q, setQ] = useState('');
 
@@ -45,6 +44,12 @@ export default function UdhaarPage() {
           {parties
             ? `${parties.length} ${tr('parties')} · ${formatINR(totalDue)} ${tr('toCollect')}`
             : tr('loading')}
+          {parties && (
+            <SpeakButton
+              text={`${parties.length} ${tr('parties')}. ${formatINR(totalDue)} ${tr('toCollect')}.`}
+              compact
+            />
+          )}
         </p>
       </div>
 
@@ -56,7 +61,7 @@ export default function UdhaarPage() {
           onChange={(e) => setQ(e.target.value)}
           aria-label={tr('searchAria')}
         />
-        <VoiceInput mode="name" onResult={(text) => setQ(text)} />
+        <VoiceInput mode="name" onResult={setQ} />
       </div>
 
       {filtered && filtered.length === 0 && (
@@ -66,9 +71,7 @@ export default function UdhaarPage() {
       )}
 
       {filtered?.map((p) => {
-        const status =
-          p.balance > 0 ? tr('due') : p.balance === 0 ? tr('settled') : tr('advance');
-        const speakText = `${p.name}, ${speakAmount(Math.abs(p.balance), locale)} ${status}`;
+        const status = p.balance > 0 ? tr('due') : p.balance === 0 ? tr('settled') : tr('advance');
 
         return (
           <Link key={p.id} href={`/party/${p.id}`} className="party-row">
@@ -91,7 +94,6 @@ export default function UdhaarPage() {
               {formatINR(Math.abs(p.balance))}
               <span className="lbl">{status}</span>
             </span>
-            <SpeakButton compact text={speakText} />
           </Link>
         );
       })}

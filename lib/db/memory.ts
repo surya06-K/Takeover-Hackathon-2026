@@ -9,6 +9,7 @@ import {
   type ScanPage,
   type Shop,
   type StockEntry,
+  type StockReminder,
   type Txn,
 } from './types';
 
@@ -24,6 +25,7 @@ interface MemState {
   pages: ScanPage[];
   sales: SaleEntry[];
   stock: StockEntry[];
+  stockReminders: StockReminder[];
 }
 
 // Survive Next.js dev HMR by hanging state off globalThis.
@@ -35,7 +37,10 @@ const state: MemState = (g.__kaagazMem ??= {
   pages: [],
   sales: [],
   stock: [],
+  stockReminders: [],
 });
+// Older HMR snapshots may predate the reminders array.
+state.stockReminders ??= [];
 
 const now = () => new Date().toISOString();
 
@@ -142,5 +147,24 @@ export const memoryStore: KaagazStore = {
     return state.stock
       .filter((s) => s.shopId === shopId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async listStockReminders(shopId) {
+    return state.stockReminders.filter((r) => r.shopId === shopId);
+  },
+  async setStockReminder(shopId, itemKey, minQty) {
+    const existing = state.stockReminders.find(
+      (r) => r.shopId === shopId && r.itemKey === itemKey
+    );
+    if (minQty == null) {
+      if (existing) state.stockReminders.splice(state.stockReminders.indexOf(existing), 1);
+      return;
+    }
+    if (existing) {
+      existing.minQty = minQty;
+      existing.updatedAt = now();
+    } else {
+      state.stockReminders.push({ shopId, itemKey, minQty, updatedAt: now() });
+    }
   },
 };

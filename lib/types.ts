@@ -1,5 +1,6 @@
-/** Entry types a register row can carry. */
-export type EntryType = 'credit' | 'payment' | 'sale' | 'stock' | null;
+/** Entry types a register row can carry — this is what routes a row to its
+ *  section (Udhaar / Sales / Stock) automatically, with no manual toggle. */
+export type EntryType = 'credit' | 'payment' | 'sale' | 'stock_in' | 'stock_out' | null;
 
 /** One row exactly as the vision model returns it. */
 export interface ExtractedRow {

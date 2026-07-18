@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useA11y } from './AccessibilityProvider';
+import { useLang } from './LanguageProvider';
 
 const TABS = [
   { href: '/home', labelKey: 'navHome' as const, icon: '🏠' },
@@ -15,29 +15,29 @@ const TABS = [
 /** Bottom tab bar (mobile-first) — hidden on login and marketing pages. */
 export default function AppShell() {
   const pathname = usePathname();
-  const { tr } = useA11y();
+  const { tr } = useLang();
 
   if (pathname === '/login' || pathname === '/') return null;
 
   return (
     <nav className="tabbar" aria-label="Sections">
-      {TABS.map((t) =>
-        t.fab ? (
-          <Link key={t.href} href={t.href} className="tab-scan" aria-label={tr('navScanAria')}>
-            {t.icon}
+      {TABS.map((tab) =>
+        tab.fab ? (
+          <Link key={tab.href} href={tab.href} className="tab-scan" aria-label={tr('navScanAria')}>
+            {tab.icon}
             <small>{tr('navScan').toUpperCase()}</small>
           </Link>
         ) : (
           <Link
-            key={t.href}
-            href={t.href}
-            className={`tab-item ${pathname.startsWith(t.href) ? 'active' : ''}`}
-            aria-label={tr(t.labelKey)}
+            key={tab.href}
+            href={tab.href}
+            className={`tab-item ${pathname.startsWith(tab.href) ? 'active' : ''}`}
+            aria-label={tr(tab.labelKey)}
           >
             <span className="tab-ic" aria-hidden>
-              {t.icon}
+              {tab.icon}
             </span>
-            <span className="tab-label">{tr(t.labelKey)}</span>
+            <span className="tab-label">{tr(tab.labelKey)}</span>
           </Link>
         )
       )}

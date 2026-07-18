@@ -64,31 +64,94 @@ export const UI_STRINGS = {
     backToUdhaar: 'Back to Udhaar',
     openingKhata: 'Opening khata…',
 
-    // accessibility
+    // voice & language
     speak: 'Listen',
     speakStop: 'Stop',
     voiceSearch: 'Speak to search',
-    voiceAmount: 'Speak amount',
+    voiceAmount: 'Speak the amount',
     langToggle: 'Language',
-    voiceHelp: 'Voice help',
-    voiceHelpOn: 'Voice help on',
-    voiceHelpOff: 'Voice help off',
-    largeText: 'Large text',
-    largeTextOn: 'Large text on',
-    largeTextOff: 'Large text off',
     help: 'Help',
-    helpClose: 'Close help',
 
-    // onboarding
-    onboardingTitle: 'How KaagazAI works',
-    onboardingStep1Title: 'Take a photo',
-    onboardingStep1Desc: 'Tap the camera button and photograph your handwritten register page.',
-    onboardingStep2Title: 'Check the rows',
-    onboardingStep2Desc: 'Compare with your paper. Tap the speaker icon to hear each row read aloud.',
-    onboardingStep3Title: 'Save to khata',
-    onboardingStep3Desc: 'After saving, see who owes how much. Tap any name to call or add payment.',
-    onboardingGotIt: 'Got it, start using',
-    onboardingSkip: 'Skip',
+    // sales
+    salesTitle: 'Sales & bill book',
+    salesSubtitle: 'Daily sales from scanned bill-book pages.',
+    noSalesTitle: 'No sales scanned yet',
+    noSalesDesc: 'Photograph a bill book page — entries will land here with running totals.',
+    todaysSales: "Today's sales",
+    totalSales: 'Total sales',
+    walkIn: 'walk-in',
+    total: 'total',
+
+    // stock
+    stockTitle: 'Stock register',
+    stockSubtitle: 'Items in and out, with restock reminders.',
+    noStockTitle: 'No stock scanned yet',
+    noStockDesc: 'Photograph a stock register page — net quantities will show up here.',
+    itemsTracked: 'Items tracked',
+    outOfStock: 'Out of stock',
+    outOfStockSub: 'net qty at or below zero',
+    restockReminders: 'Restock reminders',
+    left: 'left',
+    remindAt: 'Remind me when only this much is left',
+    remindTab: '🔔 Remind',
+    setReminder: 'Set reminder',
+    removeReminder: 'Remove reminder',
+    stockIn: 'Stock came in',
+    stockOut: 'Stock went out',
+    qtyLabel: 'Quantity',
+    items: 'items',
+    movements: 'movements',
+    itemsToRestock: 'to restock — tap to see',
+    close: 'Close',
+
+    // table columns
+    colItem: 'Item',
+    colIn: 'In',
+    colOut: 'Out',
+    colNet: 'Net',
+    colQty: 'Qty',
+    colAmount: 'Amount',
+    colDate: 'Date',
+    colParty: 'Party',
+    colSource: 'Source',
+    colType: 'Type',
+    colMovements: 'Movements',
+    manualChip: 'manual',
+    pageChip: 'page',
+
+    // scan flow
+    scanHeading: 'Scan page',
+    scanTitleReview: 'Check what the AI read',
+    scanTitleMatch: 'Who are these parties?',
+    scanSubPick: 'Hold your phone flat over the page, fill the frame, and shoot.',
+    scanSubReview: 'Nothing is saved until you approve it. Tap any cell to correct it.',
+    scanSubMatch: 'Link each name to a saved party, or create them with a phone number.',
+    takePhoto: '📷 Take a photo',
+    fromGallery: 'Choose from gallery',
+    whatRegister: 'What kind of register is this?',
+    readThisPage: 'Read this page →',
+    addPhotoFirst: 'Add a photo to continue',
+    matchPartiesBtn: 'Looks right → match parties',
+    saveEntriesBtn: '✓ Save entries',
+    reshoot: 'Re-shoot this page',
+    saveToKhata: '✓ Save to khata',
+    backToReview: '← Back to review',
+    writingEntries: 'Writing entries…',
+    scanPage: 'Scan a page',
+    scanAnother: 'Scan another page',
+
+    // review table
+    typeCredit: 'Credit (udhaar)',
+    typePayment: 'Payment (jama)',
+    typeSale: 'Sale (cash)',
+    typeStockIn: 'Stock in',
+    typeStockOut: 'Stock out',
+    addRow: 'Add a row',
+    noRows: 'No rows yet — add one below.',
+    deleteRow: 'Delete row',
+    routesTo: 'Routes to',
+    typeDecidesRouting: "Each row's Type decides where it lands — fix the Type cell below to move a row.",
+    secondLook: 'needs a second look',
 
     // spoken help per page
     helpHome: 'This is your home screen. It shows total money to collect and who to call today. Tap the camera at the bottom to scan your register.',
@@ -96,7 +159,8 @@ export const UI_STRINGS = {
     helpScan: 'Take a photo of your register page. The app will read your handwriting. Check each row and save.',
     helpParty: 'This person\'s khata. Green button means you gave credit. White button means payment came. Tap the speaker to hear the balance.',
     helpSales: 'Your sales register. Scan a bill book page to fill this.',
-    helpStock: 'Your stock register. Scan a stock page to see items in and out.',
+    helpStock:
+      'Your stock register. Tap an item to set a restock reminder or add stock in and out. Items running low show at the top.',
 
     // audio feedback labels
     saved: 'Saved successfully',
@@ -164,31 +228,91 @@ export const UI_STRINGS = {
     voiceSearch: 'बोलकर खोजें',
     voiceAmount: 'रकम बोलें',
     langToggle: 'भाषा',
-    voiceHelp: 'आवाज़ सहायता',
-    voiceHelpOn: 'आवाज़ चालू',
-    voiceHelpOff: 'आवाज़ बंद',
-    largeText: 'बड़ा अक्षर',
-    largeTextOn: 'बड़ा अक्षर चालू',
-    largeTextOff: 'बड़ा अक्षर बंद',
     help: 'मदद',
-    helpClose: 'बंद करें',
 
-    onboardingTitle: 'KaagazAI कैसे चलाएँ',
-    onboardingStep1Title: 'फोटो लें',
-    onboardingStep1Desc: 'नीचे कैमरा बटन दबाएँ और अपने हाथ से लिखे रजिस्टर का फोटो लें।',
-    onboardingStep2Title: 'पंक्तियाँ देखें',
-    onboardingStep2Desc: 'अपने कागज़ से मिलाएँ। स्पीकर दबाकर हर पंक्ति सुन सकते हैं।',
-    onboardingStep3Title: 'खाते में सेव करें',
-    onboardingStep3Desc: 'सेव के बाद देखें किससे कितना लेना है। नाम दबाकर कॉल या पेमेंट जोड़ें।',
-    onboardingGotIt: 'समझ गया, शुरू करें',
-    onboardingSkip: 'छोड़ें',
+    salesTitle: 'बिक्री और बिल बुक',
+    salesSubtitle: 'स्कैन किए बिल बुक पेज से रोज़ की बिक्री।',
+    noSalesTitle: 'अभी कोई बिक्री नहीं',
+    noSalesDesc: 'बिल बुक के पेज का फोटो लें — एंट्री यहाँ दिखेंगी।',
+    todaysSales: 'आज की बिक्री',
+    totalSales: 'कुल बिक्री',
+    walkIn: 'नकद ग्राहक',
+    total: 'कुल',
+
+    stockTitle: 'स्टॉक रजिस्टर',
+    stockSubtitle: 'सामान आया-गया, और मंगाने की याद।',
+    noStockTitle: 'अभी कोई स्टॉक नहीं',
+    noStockDesc: 'स्टॉक रजिस्टर के पेज का फोटो लें — बचा सामान यहाँ दिखेगा।',
+    itemsTracked: 'कुल सामान',
+    outOfStock: 'खत्म',
+    outOfStockSub: 'मात्रा शून्य या कम',
+    restockReminders: 'सामान मंगाने की याद',
+    left: 'बचा',
+    remindAt: 'जब इतना बचे तो याद दिलाएँ',
+    remindTab: '🔔 याद',
+    setReminder: 'याद लगाएँ',
+    removeReminder: 'याद हटाएँ',
+    stockIn: 'माल आया',
+    stockOut: 'माल गया',
+    qtyLabel: 'मात्रा',
+    items: 'सामान',
+    movements: 'एंट्री',
+    itemsToRestock: 'सामान मंगाना है — दबाकर देखें',
+    close: 'बंद करें',
+
+    colItem: 'सामान',
+    colIn: 'आया',
+    colOut: 'गया',
+    colNet: 'बचा',
+    colQty: 'मात्रा',
+    colAmount: 'रकम',
+    colDate: 'तारीख',
+    colParty: 'नाम',
+    colSource: 'स्रोत',
+    colType: 'किस्म',
+    colMovements: 'एंट्री',
+    manualChip: 'हाथ से',
+    pageChip: 'पेज',
+
+    scanHeading: 'स्कैन — पेज',
+    scanTitleReview: 'AI ने जो पढ़ा, जाँचें',
+    scanTitleMatch: 'ये ग्राहक कौन हैं?',
+    scanSubPick: 'फोन को पेज के ऊपर सीधा रखें और फोटो लें।',
+    scanSubReview: 'जब तक आप मंज़ूर न करें, कुछ सेव नहीं होता। किसी भी खाने को दबाकर सुधारें।',
+    scanSubMatch: 'हर नाम को पुराने ग्राहक से जोड़ें, या फोन नंबर के साथ नया बनाएँ।',
+    takePhoto: '📷 फोटो लें',
+    fromGallery: 'गैलरी से चुनें',
+    whatRegister: 'यह कौन-सा रजिस्टर है?',
+    readThisPage: 'यह पेज पढ़ें →',
+    addPhotoFirst: 'आगे बढ़ने के लिए फोटो जोड़ें',
+    matchPartiesBtn: 'सही है → ग्राहक जोड़ें',
+    saveEntriesBtn: '✓ एंट्री सेव करें',
+    reshoot: 'फिर से फोटो लें',
+    saveToKhata: '✓ खाते में सेव करें',
+    backToReview: '← जाँच पर वापस',
+    writingEntries: 'एंट्री लिखी जा रही…',
+    scanPage: 'पेज स्कैन करें',
+    scanAnother: 'और पेज स्कैन करें',
+
+    typeCredit: 'उधार दिया',
+    typePayment: 'पेमेंट आया',
+    typeSale: 'बिक्री (नकद)',
+    typeStockIn: 'माल आया',
+    typeStockOut: 'माल गया',
+    addRow: 'पंक्ति जोड़ें',
+    noRows: 'कोई पंक्ति नहीं — नीचे जोड़ें।',
+    deleteRow: 'पंक्ति हटाएँ',
+    routesTo: 'यहाँ जाएगा',
+    typeDecidesRouting: 'हर पंक्ति की किस्म तय करती है कि वह कहाँ जाएगी — बदलने के लिए नीचे किस्म बदलें।',
+    secondLook: 'को फिर से देखें',
 
     helpHome: 'यह आपकी होम स्क्रीन है। कुल बाकी रकम और आज किससे वसूल करना है, यह दिखता है। नीचे कैमरा दबाकर रजिस्टर स्कैन करें।',
     helpUdhaar: 'यह उधार की सूची है। जिनसे पैसे लेने हैं, वे यहाँ हैं। नाम दबाकर विवरण देखें। माइक से नाम बोलकर खोजें।',
     helpScan: 'रजिस्टर का फोटो लें। ऐप आपकी लिखावट पढ़ेगा। हर पंक्ति देखकर सेव करें।',
     helpParty: 'इस व्यक्ति का खाता। हरा बटन उधार देने के लिए। सफेद बटन पेमेंट आने पर। स्पीकर दबाकर बाकी रकम सुनें।',
     helpSales: 'आपकी बिक्री की सूची। बिल बुक का फोटो स्कैन करें।',
-    helpStock: 'आपका स्टॉक रजिस्टर। स्टॉक पेज स्कैन करें।',
+    helpStock:
+      'आपका स्टॉक रजिस्टर। सामान दबाकर मंगाने की याद लगाएँ, या माल आया-गया जोड़ें। कम बचा सामान ऊपर दिखता है।',
 
     saved: 'सेव हो गया',
     errorGeneric: 'कुछ गलत हो गया',
@@ -199,48 +323,4 @@ export type UIStringKey = keyof typeof UI_STRINGS.en;
 
 export function t(locale: UILocale, key: UIStringKey): string {
   return UI_STRINGS[locale][key];
-}
-
-/** Speak-friendly rupee amount in Hindi/English. */
-export function speakAmount(amount: number, locale: UILocale): string {
-  const abs = Math.abs(Math.round(amount));
-  if (locale === 'hi') {
-    if (abs === 0) return 'शून्य रुपये';
-    return `${numberToHindiWords(abs)} रुपये`;
-  }
-  return `${abs.toLocaleString('en-IN')} rupees`;
-}
-
-/** Convert integer to Hindi words (up to lakhs — enough for shop ledgers). */
-function numberToHindiWords(n: number): string {
-  if (n === 0) return 'शून्य';
-  const ones = ['', 'एक', 'दो', 'तीन', 'चार', 'पाँच', 'छह', 'सात', 'आठ', 'नौ'];
-  const teens = ['दस', 'ग्यारह', 'बारह', 'तेरह', 'चौदह', 'पंद्रह', 'सोलह', 'सत्रह', 'अठारह', 'उन्नीस'];
-  const tens = ['', '', 'बीस', 'तीस', 'चालीस', 'पचास', 'साठ', 'सत्तर', 'अस्सी', 'नब्बे'];
-
-  function below100(x: number): string {
-    if (x < 10) return ones[x];
-    if (x < 20) return teens[x - 10];
-    const t = Math.floor(x / 10);
-    const o = x % 10;
-    return o ? `${tens[t]} ${ones[o]}` : tens[t];
-  }
-
-  function below1000(x: number): string {
-    if (x < 100) return below100(x);
-    const h = Math.floor(x / 100);
-    const r = x % 100;
-    return r ? `${ones[h]} सौ ${below100(r)}` : `${ones[h]} सौ`;
-  }
-
-  const parts: string[] = [];
-  const lakh = Math.floor(n / 100000);
-  const thousand = Math.floor((n % 100000) / 1000);
-  const rest = n % 1000;
-
-  if (lakh) parts.push(`${below1000(lakh)} लाख`);
-  if (thousand) parts.push(`${below1000(thousand)} हज़ार`);
-  if (rest) parts.push(below1000(rest));
-
-  return parts.join(' ').replace(/\s+/g, ' ').trim();
 }

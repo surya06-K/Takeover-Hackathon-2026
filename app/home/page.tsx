@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SpeakButton from '@/components/SpeakButton';
-import { useA11y } from '@/components/AccessibilityProvider';
-import { speakAmount } from '@/lib/i18n';
+import { useLang } from '@/components/LanguageProvider';
 import { formatINR } from '@/lib/ledger';
 import { formatPhone } from '@/lib/phone';
 
@@ -18,12 +17,13 @@ interface DashData {
     biggestDebtor: { id: string; name: string; balance: number } | null;
   };
   collectToday: { id: string; name: string; phone: string | null; balance: number; entries: number }[];
+  restock: { count: number; items: { item: string; net: number; minQty: number }[] };
   recent: { kind: string; at: string; title: string; sub: string; amount: number | null }[];
 }
 
 export default function HomePage() {
   const router = useRouter();
-  const { tr, locale, say, voiceHelp } = useA11y();
+  const { tr, locale } = useLang();
   const [shop, setShop] = useState<{ name: string } | null>(null);
   const [storage, setStorage] = useState<'memory' | 'supabase'>('memory');
   const [data, setData] = useState<DashData | null>(null);
@@ -42,17 +42,21 @@ export default function HomePage() {
     })();
   }, [router]);
 
-  useEffect(() => {
-    if (!voiceHelp || !data) return;
-    const outstanding = speakAmount(data.stats.outstanding, locale);
-    say(`${tr('outstanding')}: ${outstanding}`);
-  }, [data, voiceHelp]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const today = new Date().toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-IN', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
   });
+
+  const outstandingSpoken = `${tr('outstanding')} ${formatINR(data?.stats.outstanding ?? 0)}. ${
+    data?.stats.flaggedCount ?? 0
+  } ${tr('parties')} ₹5,000+.`;
+
+  const restockSpoken = data?.restock.count
+    ? `${tr('restockReminders')}: ${data.restock.items
+        .map((i) => `${i.item}, ${i.net} ${tr('left')}`)
+        .join('. ')}`
+    : '';
 
   return (
     <div className="container">
@@ -71,22 +75,19 @@ export default function HomePage() {
       </div>
 
       <div className="cards-grid" style={{ gridTemplateColumns: '1fr 1fr', margin: '16px 0 20px' }}>
-        <div className="stat-card stat-card-speak">
-          <div className="stat-label">{tr('outstanding')}</div>
+        <div className="stat-card">
+          <div className="stat-label">
+            {tr('outstanding')} <SpeakButton text={outstandingSpoken} compact />
+          </div>
           <div className="stat-value money">{formatINR(data?.stats.outstanding ?? 0)}</div>
           <div className="stat-sub">
             {data?.stats.partyCount ?? 0} {tr('parties')}
           </div>
-          <SpeakButton
-            compact
-            text={`${tr('outstanding')}: ${speakAmount(data?.stats.outstanding ?? 0, locale)}`}
-          />
         </div>
-        <div className="stat-card stat-card-speak">
+        <div className="stat-card">
           <div className="stat-label">{tr('flaggedDue')}</div>
           <div className="stat-value" style={{ color: 'var(--red)' }}>
-            {data?.stats.flaggedCount ?? 0}{' '}
-            {data?.stats.flaggedCount === 1 ? tr('party') : tr('parties')}
+            {data?.stats.flaggedCount ?? 0} {data?.stats.flaggedCount === 1 ? tr('party') : tr('parties')}
           </div>
           <div className="stat-sub">
             {data?.stats.biggestDebtor
@@ -95,6 +96,23 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {data && data.restock.count > 0 && (
+        <Link href="/stock" className="restock-card">
+          <span className="restock-bell" aria-hidden>
+            🔔
+          </span>
+          <span className="restock-mid">
+            <span className="restock-title">
+              {data.restock.count} {tr('items')} {tr('itemsToRestock')}
+            </span>
+            <span className="restock-sub">
+              {data.restock.items.map((i) => `${i.item} · ${i.net} ${tr('left')}`).join('  ·  ')}
+            </span>
+          </span>
+          <SpeakButton text={restockSpoken} compact />
+        </Link>
+      )}
 
       {data && data.collectToday.length > 0 && (
         <>
@@ -114,10 +132,6 @@ export default function HomePage() {
                 </span>
               </span>
               <span className="party-amt amt-due">{formatINR(p.balance)}</span>
-              <SpeakButton
-                compact
-                text={`${p.name}, ${speakAmount(p.balance, locale)} ${tr('due')}`}
-              />
             </Link>
           ))}
         </>

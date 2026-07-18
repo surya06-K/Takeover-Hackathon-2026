@@ -2,22 +2,24 @@
 
 import { useState } from 'react';
 import { getSpeaking, speak, stopSpeaking } from '@/lib/speech';
-import { useA11y } from './AccessibilityProvider';
+import { useLang } from './LanguageProvider';
 
 interface SpeakButtonProps {
   text: string;
-  className?: string;
-  /** Compact icon-only mode */
+  /** Icon-only mode for tight rows/tables. */
   compact?: boolean;
+  className?: string;
 }
 
-/** Tap to hear text aloud — essential for low-literacy users. */
-export default function SpeakButton({ text, className = '', compact = false }: SpeakButtonProps) {
-  const { locale, tr, feedbackTap } = useA11y();
+/** Tap to hear text aloud — the ears of the app for non-readers. */
+export default function SpeakButton({ text, compact = false, className = '' }: SpeakButtonProps) {
+  const { locale, tr } = useLang();
   const [busy, setBusy] = useState(false);
 
-  async function toggle() {
-    feedbackTap();
+  async function toggle(e: React.MouseEvent) {
+    // Speak buttons sit inside links/rows — listening must not navigate.
+    e.preventDefault();
+    e.stopPropagation();
     if (getSpeaking()) {
       stopSpeaking();
       setBusy(false);

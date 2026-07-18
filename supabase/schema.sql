@@ -86,3 +86,13 @@ alter table pages enable row level security;
 alter table transactions enable row level security;
 alter table sale_entries enable row level security;
 alter table stock_entries enable row level security;
+
+-- Restock reminders: per-item "remind me at" quantity level
+create table if not exists stock_reminders (
+  shop_id text not null references shops(id) on delete cascade,
+  item_key text not null,
+  min_qty numeric not null default 0 check (min_qty >= 0),
+  updated_at timestamptz not null default now(),
+  primary key (shop_id, item_key)
+);
+alter table stock_reminders enable row level security;

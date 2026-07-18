@@ -1,6 +1,6 @@
 'use client';
 
-import { useA11y } from './AccessibilityProvider';
+import { playTap } from '@/lib/audio';
 
 const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✓'];
 
@@ -12,10 +12,8 @@ interface NumPadProps {
 
 /** Visual number pad — no typing needed for amounts. */
 export default function NumPad({ value, onChange, onConfirm }: NumPadProps) {
-  const { feedbackTap } = useA11y();
-
   function press(key: string) {
-    feedbackTap();
+    playTap();
     if (key === '⌫') {
       onChange(value.slice(0, -1));
       return;

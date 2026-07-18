@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { stockItemKey } from '@/lib/db/types';
 import { currentShopId } from '@/lib/session';
 
 export const runtime = 'nodejs';
@@ -12,11 +13,27 @@ export async function GET() {
   if (!shopId) return NextResponse.json({ ok: false }, { status: 401 });
 
   const store = db();
-  const [parties, txns, pages] = await Promise.all([
+  const [parties, txns, pages, stock, reminders] = await Promise.all([
     store.listParties(shopId),
     store.listTxns(shopId),
     store.listPages(shopId),
+    store.listStock(shopId),
+    store.listStockReminders(shopId),
   ]);
+
+  // Items at or below their reminder level (default level 0 = out of stock).
+  const reminderByKey = new Map(reminders.map((r) => [r.itemKey, r.minQty]));
+  const netByKey = new Map<string, { item: string; net: number }>();
+  for (const e of stock) {
+    const key = stockItemKey(e.item);
+    const agg = netByKey.get(key) ?? { item: e.item.trim(), net: 0 };
+    agg.net += e.direction === 'in' ? e.qty : -e.qty;
+    netByKey.set(key, agg);
+  }
+  const restockItems = [...netByKey.entries()]
+    .map(([key, { item, net }]) => ({ item, net, minQty: reminderByKey.get(key) ?? 0 }))
+    .filter((i) => i.net <= i.minQty)
+    .sort((a, b) => a.net - b.net);
 
   const outstanding = parties.reduce((s, p) => s + Math.max(p.balance, 0), 0);
   const flagged = parties.filter((p) => p.balance >= FLAG_THRESHOLD);
@@ -58,6 +75,7 @@ export async function GET() {
       balance: p.balance,
       entries: p.entries,
     })),
+    restock: { count: restockItems.length, items: restockItems.slice(0, 3) },
     recent,
   });
 }

@@ -1,7 +1,9 @@
 'use client';
 
-import { uid, type EntryType } from '@/lib/types';
 import SpeakButton from './SpeakButton';
+import { useLang } from './LanguageProvider';
+import { uid, type EntryType } from '@/lib/types';
+import type { UIStringKey } from '@/lib/i18n';
 
 /**
  * Editable representation of an extracted row: qty/amount stay strings while
@@ -27,12 +29,13 @@ export function isLowConfidence(row: ReviewRow): boolean {
   return row.amount.trim() === '' || (row.party.trim() === '' && row.item.trim() === '');
 }
 
-const TYPE_OPTIONS: { value: string; label: string }[] = [
-  { value: '', label: '—' },
-  { value: 'credit', label: 'Credit (udhaar)' },
-  { value: 'payment', label: 'Payment (jama)' },
-  { value: 'sale', label: 'Sale' },
-  { value: 'stock', label: 'Stock' },
+const TYPE_OPTIONS: { value: string; labelKey: UIStringKey | null }[] = [
+  { value: '', labelKey: null },
+  { value: 'credit', labelKey: 'typeCredit' },
+  { value: 'payment', labelKey: 'typePayment' },
+  { value: 'sale', labelKey: 'typeSale' },
+  { value: 'stock_in', labelKey: 'typeStockIn' },
+  { value: 'stock_out', labelKey: 'typeStockOut' },
 ];
 
 interface Props {
@@ -41,6 +44,8 @@ interface Props {
 }
 
 export default function ReviewTable({ rows, onChange }: Props) {
+  const { tr } = useLang();
+
   const update = (id: string, patch: Partial<ReviewRow>) =>
     onChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
@@ -53,13 +58,14 @@ export default function ReviewTable({ rows, onChange }: Props) {
       <table className="review-table">
         <thead>
           <tr>
-            <th style={{ width: '13%' }}>Date</th>
-            <th style={{ width: '22%' }}>Party</th>
-            <th style={{ width: '24%' }}>Item</th>
-            <th style={{ width: '9%' }}>Qty</th>
-            <th style={{ width: '13%' }}>Amount ₹</th>
-            <th style={{ width: '15%' }}>Type</th>
-            <th aria-label="Delete" style={{ width: '4%' }} />
+            <th aria-label={tr('speak')} style={{ width: '4%' }} />
+            <th style={{ width: '12%' }}>{tr('colDate')}</th>
+            <th style={{ width: '21%' }}>{tr('colParty')}</th>
+            <th style={{ width: '23%' }}>{tr('colItem')}</th>
+            <th style={{ width: '8%' }}>{tr('colQty')}</th>
+            <th style={{ width: '13%' }}>{tr('colAmount')} ₹</th>
+            <th style={{ width: '15%' }}>{tr('colType')}</th>
+            <th aria-label={tr('deleteRow')} style={{ width: '4%' }} />
           </tr>
         </thead>
         <tbody>
@@ -71,15 +77,15 @@ export default function ReviewTable({ rows, onChange }: Props) {
           })}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={7} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
-                No rows yet — add one below.
+              <td colSpan={8} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>
+                {tr('noRows')}
               </td>
             </tr>
           )}
         </tbody>
       </table>
       <button type="button" className="add-row-btn" onClick={add}>
-        + Add a row
+        + {tr('addRow')}
       </button>
     </div>
   );
@@ -96,17 +102,34 @@ function RowPair({
   onUpdate: (id: string, patch: Partial<ReviewRow>) => void;
   onRemove: (id: string) => void;
 }) {
+  const { tr } = useLang();
   const cls = low ? 'row-low' : '';
+
+  const typeKey = TYPE_OPTIONS.find((o) => o.value === (row.type ?? ''))?.labelKey;
+  // Spoken version of the row — lets a non-reader verify against their paper.
+  const spoken = [
+    row.party.trim(),
+    row.item.trim(),
+    row.qty.trim() && `${row.qty.trim()} ${tr('colQty')}`,
+    row.amount.trim() && `${row.amount.trim()} ₹`,
+    typeKey ? tr(typeKey) : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+
   return (
     <>
       <tr className={cls}>
+        <td>
+          <SpeakButton text={spoken} compact />
+        </td>
         <td>
           <input
             className="cell-input"
             value={row.date}
             placeholder="date"
             onChange={(e) => onUpdate(row.id, { date: e.target.value })}
-            aria-label="Date"
+            aria-label={tr('colDate')}
           />
         </td>
         <td>
@@ -115,7 +138,7 @@ function RowPair({
             value={row.party}
             placeholder="party name"
             onChange={(e) => onUpdate(row.id, { party: e.target.value })}
-            aria-label="Party"
+            aria-label={tr('colParty')}
           />
         </td>
         <td>
@@ -124,7 +147,7 @@ function RowPair({
             value={row.item}
             placeholder="item"
             onChange={(e) => onUpdate(row.id, { item: e.target.value })}
-            aria-label="Item"
+            aria-label={tr('colItem')}
           />
         </td>
         <td>
@@ -134,7 +157,7 @@ function RowPair({
             placeholder="–"
             inputMode="decimal"
             onChange={(e) => onUpdate(row.id, { qty: e.target.value })}
-            aria-label="Quantity"
+            aria-label={tr('colQty')}
           />
         </td>
         <td>
@@ -144,7 +167,7 @@ function RowPair({
             placeholder="–"
             inputMode="decimal"
             onChange={(e) => onUpdate(row.id, { amount: e.target.value })}
-            aria-label="Amount in rupees"
+            aria-label={tr('colAmount')}
           />
         </td>
         <td>
@@ -152,11 +175,11 @@ function RowPair({
             className="type-select"
             value={row.type ?? ''}
             onChange={(e) => onUpdate(row.id, { type: (e.target.value || null) as EntryType })}
-            aria-label="Entry type"
+            aria-label={tr('colType')}
           >
             {TYPE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {o.labelKey ? tr(o.labelKey) : '—'}
               </option>
             ))}
           </select>
@@ -165,8 +188,8 @@ function RowPair({
           <button
             type="button"
             className="icon-btn"
-            title="Delete row"
-            aria-label="Delete row"
+            title={tr('deleteRow')}
+            aria-label={tr('deleteRow')}
             onClick={() => onRemove(row.id)}
           >
             ✕
@@ -175,12 +198,8 @@ function RowPair({
       </tr>
       {row.raw_text && (
         <tr className={`raw-line ${cls}`}>
-          <td colSpan={6}>as written: “{row.raw_text}”</td>
-          <td>
-            <SpeakButton
-              compact
-              text={[row.party, row.item, row.amount ? `${row.amount} rupees` : ''].filter(Boolean).join(', ')}
-            />
+          <td colSpan={8}>
+            {tr('asWritten')}: “{row.raw_text}”
           </td>
         </tr>
       )}

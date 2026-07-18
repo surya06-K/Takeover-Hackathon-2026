@@ -9,6 +9,7 @@ import {
   type ScanPage,
   type Shop,
   type StockEntry,
+  type StockReminder,
   type Txn,
 } from './types';
 
@@ -91,6 +92,13 @@ const mapSale = (r: any): SaleEntry => ({
   txnDate: r.txn_date,
   rawText: r.raw_text,
   createdAt: r.created_at,
+});
+
+const mapReminder = (r: any): StockReminder => ({
+  shopId: r.shop_id,
+  itemKey: r.item_key,
+  minQty: Number(r.min_qty),
+  updatedAt: r.updated_at,
 });
 
 const mapStock = (r: any): StockEntry => ({
@@ -284,5 +292,32 @@ export const supabaseStore: KaagazStore = {
       .order('created_at', { ascending: false });
     if (error) fail('listStock', error);
     return (data ?? []).map(mapStock);
+  },
+
+  async listStockReminders(shopId) {
+    const { data, error } = await sb()
+      .from('stock_reminders')
+      .select('*')
+      .eq('shop_id', shopId);
+    if (error) fail('listStockReminders', error);
+    return (data ?? []).map(mapReminder);
+  },
+  async setStockReminder(shopId, itemKey, minQty) {
+    if (minQty == null) {
+      const { error } = await sb()
+        .from('stock_reminders')
+        .delete()
+        .eq('shop_id', shopId)
+        .eq('item_key', itemKey);
+      if (error) fail('setStockReminder.delete', error);
+      return;
+    }
+    const { error } = await sb()
+      .from('stock_reminders')
+      .upsert(
+        { shop_id: shopId, item_key: itemKey, min_qty: minQty, updated_at: new Date().toISOString() },
+        { onConflict: 'shop_id,item_key' }
+      );
+    if (error) fail('setStockReminder', error);
   },
 };

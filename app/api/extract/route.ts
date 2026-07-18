@@ -6,9 +6,21 @@ export const maxDuration = 60;
 
 const SYSTEM_PROMPT =
   "You are an expert at reading handwritten Indian business registers (Hindi, Telugu, English, Hinglish mixed). " +
-  "Extract every row. Respond ONLY strict JSON: { register_type: string, confidence: number, rows: [{ date: string|null, " +
-  "party: string|null, item: string|null, qty: number|null, amount: number|null, type: 'credit'|'payment'|'sale'|'stock'|null, " +
-  "raw_text: string }], notes: string }. If a value is unreadable, set null and preserve raw_text. Never invent values.";
+  "A single page often mixes different kinds of entries — udhaar given, payments received, cash sales, stock movements " +
+  "— and each row must be tagged with the PRECISE category below so it can be routed automatically:\n" +
+  "- \"credit\": goods or money given to a party ON CREDIT (udhaar/udhar) — increases what they owe. Look for words like " +
+  "udhaar, udhar, khata, or an amount with no cash/payment mentioned against a named customer.\n" +
+  "- \"payment\": money the shopkeeper RECEIVED from a party against an existing due — decreases what they owe. Look for " +
+  "jama, mila, paid, received, cash/UPI/cheque against a name.\n" +
+  "- \"sale\": a direct CASH sale or bill — goods sold and paid for immediately, no running balance with a party (the " +
+  "party name may be absent — \"walk-in\").\n" +
+  "- \"stock_in\": inventory RECEIVED into the shop (goods purchased/arrived from a supplier) — no customer balance involved.\n" +
+  "- \"stock_out\": inventory taken OUT for a reason other than a recorded sale (damaged, given away, transferred) — rare; " +
+  "prefer \"sale\" when goods clearly left in exchange for money.\n" +
+  "Extract every row exactly as written; do not skip any. Respond ONLY strict JSON: { register_type: string, " +
+  "confidence: number, rows: [{ date: string|null, party: string|null, item: string|null, qty: number|null, " +
+  "amount: number|null, type: 'credit'|'payment'|'sale'|'stock_in'|'stock_out'|null, raw_text: string }], notes: string }. " +
+  "If a value is unreadable or the category is genuinely ambiguous, set it null and preserve raw_text — never invent or guess.";
 
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
@@ -185,7 +197,7 @@ function parseModelJson(text: string): ExtractResult {
   };
 }
 
-const ENTRY_TYPES = ['credit', 'payment', 'sale', 'stock'] as const;
+const ENTRY_TYPES = ['credit', 'payment', 'sale', 'stock_in', 'stock_out'] as const;
 
 function normalizeRow(r: any): ExtractedRow {
   const type = typeof r?.type === 'string' ? r.type.toLowerCase().trim() : null;
@@ -238,38 +250,39 @@ function friendly(status: number, error: string, detail?: string) {
 }
 
 /* ------------------------- built-in sample register ------------------------ */
-/** Two pages of a realistic kirana udhaar register so the merge demo works
- *  end-to-end without API keys. Clearly labelled `model: "sample"` in the UI. */
+/** Two pages of a realistic kirana register so the demo works end-to-end
+ *  without API keys — each page mixes udhaar, cash-sale and stock rows just
+ *  like a real shopkeeper's book, so auto-routing can be exercised offline.
+ *  Clearly labelled `model: "sample"` in the UI. */
 function samplePage(pageNumber: number): ExtractResult {
   const pages: ExtractResult[] = [
     {
-      register_type: 'Udhaar / Credit Ledger',
+      register_type: 'Kirana Store Ledger',
       confidence: 0.86,
       notes:
         'Sample page 1 (built-in demo data — add GEMINI_API_KEY to read real photos). Names appear in Hindi, Telugu and English, just like a real register. Amount for लक्ष्मी जनरल was smudged.',
       rows: [
-        { date: '02/07/2026', party: 'रमेश यादव', item: 'Atta 10kg', qty: 2, amount: 920, type: 'credit', raw_text: 'रमेश यादव — आटा 10kg x2 — 920' },
-        { date: '02/07/2026', party: 'Sunita Devi', item: 'Tel (oil) 1L', qty: 3, amount: 540, type: 'credit', raw_text: 'सुनीता देवी तेल 1L x3 ₹540 udhaar' },
-        { date: '03/07/2026', party: 'रमेश यादव', item: null, qty: null, amount: 500, type: 'payment', raw_text: 'रमेश जमा ₹500' },
-        { date: '03/07/2026', party: 'ఆనంద్ ట్రేడర్స్', item: 'Chawal 25kg', qty: 5, amount: 6250, type: 'credit', raw_text: 'ఆనంద్ ట్రేడర్స్ — chawal 25kg bag x5 = 6250' },
+        { date: '02/07/2026', party: 'Lakshmi General', item: 'Soap Meda', qty: 4, amount: 81, type: 'sale', raw_text: '1) लक्ष्मी जनरल - సబ్బు మెడ x4 → 81-' },
+        { date: '02/07/2026', party: 'Sunitha Devi', item: 'Full Jang', qty: null, amount: 540, type: 'credit', raw_text: '2) Sunitha Devi - Full Jang → 540 /- udhaar' },
+        { date: '02/07/2026', party: 'Ramesh Yadav', item: 'Atta (wheat flour) 10kg', qty: 2, amount: 920, type: 'credit', raw_text: '3) रमेश यादव - आटा 10kg x2 → 920 /- उधार' },
+        { date: '03/07/2026', party: 'Ramesh Yadav', item: null, qty: null, amount: 500, type: 'payment', raw_text: '4) रमेश जमा ₹500' },
+        { date: '03/07/2026', party: null, item: 'Chawal 25kg bag', qty: 10, amount: null, type: 'stock_in', raw_text: '5) చావల్ 25kg బ్యాగ్ x10 వచ్చాయి (కొత్త స్టాక్)' },
         { date: '04/07/2026', party: 'लक्ष्मी जनरल', item: 'Sabun (soap) box', qty: 4, amount: null, type: 'credit', raw_text: 'లక్ష్మి జనరల్ — సబ్బు పెట్టె x4 — ??? (smudged)' },
-        { date: '04/07/2026', party: 'Sunita Devi', item: null, qty: null, amount: 540, type: 'payment', raw_text: 'Sunita full jama 540' },
       ],
     },
     {
-      register_type: 'Udhaar / Credit Ledger',
+      register_type: 'Kirana Store Ledger',
       confidence: 0.79,
       notes:
-        'Sample page 2 (built-in demo data). Handwriting fainter on this page; one qty unreadable. रमेश यादव, ఆనంద్ ట్రేడర్స్ and भवानी स्टोर्स carry over from page 1.',
+        'Sample page 2 (built-in demo data). Handwriting fainter on this page; one qty unreadable. Ramesh Yadav and Anand Traders carry over from page 1.',
       rows: [
         { date: '05/07/2026', party: 'ఆనంద్ ట్రేడర్స్', item: null, qty: null, amount: 2000, type: 'payment', raw_text: 'ఆనంద్ — 2000 jama (cheque)' },
-        { date: '05/07/2026', party: 'भवानी स्टोर्स', item: 'Chini (sugar) 5kg', qty: 6, amount: 1380, type: 'credit', raw_text: 'भवानी स्टोर्स चीनी 5kg x6 — 1380' },
+        { date: '05/07/2026', party: null, item: 'Chini (sugar) 1kg pack', qty: 12, amount: 480, type: 'sale', raw_text: 'चीनी 1kg pack x12 cash sale — 480' },
         { date: '06/07/2026', party: 'रमेश यादव', item: 'Dal 5kg', qty: null, amount: 780, type: 'credit', raw_text: 'रमेश — dal 5kg x? ₹780 (qty faint)' },
         { date: '06/07/2026', party: 'मोहम्मद इरफ़ान', item: 'Biscuit carton', qty: 2, amount: 3400, type: 'credit', raw_text: 'Md Irfan biscuit carton x2 3400 udhaar' },
-        { date: '06/07/2026', party: 'मोहम्मद इरफ़ान', item: 'Namkeen carton', qty: 1, amount: 1750, type: 'credit', raw_text: 'Irfan namkeen x1 1750' },
+        { date: '06/07/2026', party: null, item: 'Namkeen carton (damaged, written off)', qty: 1, amount: null, type: 'stock_out', raw_text: 'नमकीन कार्टन x1 खराब — हटाया' },
         { date: '06/07/2026', party: 'भवानी स्टोर्स', item: null, qty: null, amount: 1000, type: 'payment', raw_text: 'Bhavani jama 1000/-' },
       ],
-
     },
   ];
   return pages[(pageNumber - 1) % pages.length];

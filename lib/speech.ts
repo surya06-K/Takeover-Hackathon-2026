@@ -2,6 +2,25 @@
 
 import type { UILocale } from './i18n';
 
+/** Minimal Web Speech API shape — not in TS's DOM lib. */
+interface SpeechRecognitionResultLike {
+  transcript: string;
+}
+interface SpeechRecognitionEvent extends Event {
+  results: { [index: number]: { [index: number]: SpeechRecognitionResultLike } };
+}
+interface SpeechRecognition extends EventTarget {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((ev: SpeechRecognitionEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+declare const SpeechRecognition: { new (): SpeechRecognition };
+
 export type SpeechLang = 'en-IN' | 'hi-IN';
 
 export function speechLang(locale: UILocale): SpeechLang {

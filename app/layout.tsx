@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
-import AccessibilityToolbar from '@/components/AccessibilityToolbar';
-import ClientProviders from '@/components/ClientProviders';
+import HeaderControls from '@/components/HeaderControls';
+import { LanguageProvider } from '@/components/LanguageProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -29,19 +29,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <ClientProviders>
+        <LanguageProvider>
           <header className="site-header">
             <div className="container header-row">
               <Link href="/home" className="brand">
                 Kaagaz<em>AI</em>
                 <span className="brand-hindi">कागज़ → डिजिटल</span>
               </Link>
-              <AccessibilityToolbar />
+              <HeaderControls />
             </div>
           </header>
           <main className="app-main">{children}</main>
           <AppShell />
-        </ClientProviders>
+        </LanguageProvider>
       </body>
     </html>
   );
