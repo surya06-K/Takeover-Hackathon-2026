@@ -21,10 +21,12 @@ interface SpeechRecognition extends EventTarget {
 }
 declare const SpeechRecognition: { new (): SpeechRecognition };
 
-export type SpeechLang = 'en-IN' | 'hi-IN';
+export type SpeechLang = 'en-IN' | 'hi-IN' | 'te-IN';
 
 export function speechLang(locale: UILocale): SpeechLang {
-  return locale === 'hi' ? 'hi-IN' : 'en-IN';
+  if (locale === 'hi') return 'hi-IN';
+  if (locale === 'te') return 'te-IN';
+  return 'en-IN';
 }
 
 export function isSpeechSupported(): boolean {
@@ -60,7 +62,7 @@ export function speak(text: string, locale: UILocale = 'hi'): Promise<void> {
 
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = speechLang(locale);
-    utter.rate = locale === 'hi' ? 0.92 : 1;
+    utter.rate = locale === 'en' ? 1 : 0.92;
     utter.pitch = 1;
 
     utter.onend = () => {

@@ -42,11 +42,14 @@ export default function HomePage() {
     })();
   }, [router]);
 
-  const today = new Date().toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
+  const today = new Date().toLocaleDateString(
+    locale === 'hi' ? 'hi-IN' : locale === 'te' ? 'te-IN' : 'en-IN',
+    {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    },
+  );
 
   const outstandingSpoken = `${tr('outstanding')} ${formatINR(data?.stats.outstanding ?? 0)}. ${
     data?.stats.flaggedCount ?? 0

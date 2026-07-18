@@ -3,7 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { speak, getSpeaking, stopSpeaking } from '@/lib/speech';
 import { useLang } from './LanguageProvider';
-import type { UIStringKey } from '@/lib/i18n';
+import type { UILocale, UIStringKey } from '@/lib/i18n';
+
+/** Cycle order and chip label for each UI language. */
+const LOCALE_CYCLE: UILocale[] = ['hi', 'en', 'te'];
+const LOCALE_LABEL: Record<UILocale, string> = { hi: 'हि', en: 'EN', te: 'తె' };
 
 /** Header chips: big हि/EN language toggle + 🔊❓ spoken help for the current page. */
 export default function HeaderControls() {
@@ -29,17 +33,22 @@ export default function HeaderControls() {
     else speak(tr(helpKey), locale);
   }
 
+  function cycleLocale() {
+    const next = LOCALE_CYCLE[(LOCALE_CYCLE.indexOf(locale) + 1) % LOCALE_CYCLE.length];
+    setLocale(next);
+  }
+
   return (
     <div className="header-controls">
       <button
         type="button"
-        className={`a11y-chip ${locale === 'hi' ? 'active' : ''}`}
-        onClick={() => setLocale(locale === 'hi' ? 'en' : 'hi')}
-        aria-pressed={locale === 'hi'}
+        className={`a11y-chip ${locale !== 'en' ? 'active' : ''}`}
+        onClick={cycleLocale}
+        aria-pressed={locale !== 'en'}
         aria-label={tr('langToggle')}
         title={tr('langToggle')}
       >
-        {locale === 'hi' ? 'हि' : 'EN'}
+        {LOCALE_LABEL[locale]}
       </button>
       <button
         type="button"
